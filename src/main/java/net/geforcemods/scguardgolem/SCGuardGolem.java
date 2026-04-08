@@ -51,7 +51,7 @@ public class SCGuardGolem {
 
         ServerLevel serverLevel = (ServerLevel) event.getLevel();
         SecurityGolemEntity golem = SCGContent.SECURITY_GOLEM.get()
-                .create(serverLevel, null, null, null, null, MobSpawnType.CONVERSION, false, false);
+                .create(serverLevel, null, null, ironGolem.blockPosition(), MobSpawnType.CONVERSION, false, false);
         if (golem == null) return;
 
         golem.moveTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
