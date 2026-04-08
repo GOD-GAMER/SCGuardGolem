@@ -1,0 +1,9 @@
+{
+  "entity.scguardgolem.security_golem": "Security Guard Golem",
+  "item.scguardgolem.scg_manual": "Security Golem Manual",
+  "itemGroup.scguardgolem": "Security Guard Golem",
+  "scguardgolem.conversion.success": "Iron Golem converted into a Security Guard Golem! You are now its owner.",
+  "scguardgolem.manual.tooltip": "Right-click to view the user guide",
+  "scguardgolem.command.no_golem": "No Security Golem found nearby.",
+  "scguardgolem.badge_check.halt": "Halt! Show your badge or leave the area."
+}
