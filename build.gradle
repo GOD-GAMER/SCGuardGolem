@@ -1,4 +1,5 @@
 plugins {
+    id 'net.darkhax.curseforgegradle' version '1.1.18'
     id 'eclipse'
     id 'idea'
     id 'net.minecraftforge.gradle' version '[6.0.16,6.2)'
@@ -65,4 +66,21 @@ jar {
 processResources {
     exclude '.cache'
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+
+task curseforge(type: net.darkhax.curseforgegradle.TaskPublishCurseForge) {
+    dependsOn jar
+    disableVersionDetection()
+    apiToken = findProperty('curseforgeApiToken') ?: System.getenv('CURSEFORGE_TOKEN') ?: ''
+
+    def rawId = findProperty('curseforgeProjectId') ?: '0'
+    def projectId = rawId.toString().isNumber() ? rawId.toString().toInteger() : 0
+    def mainFile = upload(projectId, jar)
+    mainFile.releaseType = 'release'
+    mainFile.addModLoader('Forge')
+    mainFile.addGameVersion(project.mcVersion)
+    mainFile.changelog = "See https://github.com/GOD-GAMER/SCGuardGolem/blob/mc/${project.mcVersion}/CHANGELOG.md"
+    mainFile.changelogType = 'markdown'
+    mainFile.addRequirement('security-craft')
 }
