@@ -1,5 +1,6 @@
 plugins {
     id("net.neoforged.moddev") version "2.0.107"
+    id("net.darkhax.curseforgegradle") version "1.1.25"
 }
 
 val modId = "scguardgolem"
@@ -65,4 +66,20 @@ repositories {
 
 dependencies {
     compileOnly(fileTree("libs") { include("*.jar") })
+}
+
+tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge::class) {
+    dependsOn(tasks.jar)
+    disableVersionDetection()
+    apiToken = findProperty("curseforgeApiToken") as String?
+        ?: System.getenv("CURSEFORGE_TOKEN") ?: ""
+
+    val projectId = (findProperty("curseforgeProjectId") as String?)?.toIntOrNull() ?: 0
+    val mainFile = upload(projectId, tasks.jar.get().archiveFile)
+    mainFile.releaseType = "release"
+    mainFile.addModLoader("NeoForge")
+    mainFile.addGameVersion(mcVersion)
+    mainFile.changelog = "See https://github.com/GOD-GAMER/SCGuardGolem/blob/mc/${mcVersion}/CHANGELOG.md"
+    mainFile.changelogType = "markdown"
+    mainFile.addRequirement("security-craft")
 }
