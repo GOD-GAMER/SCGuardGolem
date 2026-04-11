@@ -1,0 +1,76 @@
+--------------------------------------------------------------------------------
+
+Command-Line:
+ - C:\Program Files\Eclipse Adoptium\jdk-21.0.9.10-hotspot\bin\java.exe
+ - -jar
+ - C:\Users\cabca\.gradle\caches\modules-2\files-2.1\net.neoforged.jst\jst-cli-bundle\1.0.66\6340d2fe4a46f4e2bf6798f477ca82ec046ea9f2\jst-cli-bundle-1.0.66.jar
+ - --libraries-list
+ - C:\Users\cabca\.gradle\caches\neoformruntime\intermediate_results\listLibraries_aeaa454ebd2e0c999c477bde1470a5ce406f06a9_output.txt
+ - --in-format
+ - ARCHIVE
+ - --out-format
+ - ARCHIVE
+ - --enable-accesstransformers
+ - --access-transformer
+ - ats\accesstransformer.cfg
+ - --access-transformer
+ - ats\_script_neoforge.cfg
+ - C:\Users\cabca\.gradle\caches\neoformruntime\intermediate_results\applyNeoforgePatches_88fef1624d2e75737b059f15a8f1053c879fc2b7_output.zip
+ - ./output.zip
+--------------------------------------------------------------------------------
+
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.IKeyConflictContext
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.IKeyConflictContext
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.IKeyConflictContext
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.KeyModifier
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.IKeyConflictContext
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.KeyModifier
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.IKeyConflictContext
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.IKeyConflictContext
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.KeyModifier
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.KeyModifier
+Failed to create binary representation for type net.neoforged.neoforge.client.settings.KeyModifier
+Failed to create binary representation for type net.neoforged.neoforge.client.model.ExtraFaceData
+Failed to create binary representation for type net.neoforged.neoforge.client.model.ExtraFaceData
+Failed to create binary representation for type net.neoforged.neoforge.client.model.ExtraFaceData
+Failed to create binary representation for type net.neoforged.neoforge.client.model.ExtraFaceData
+Failed to create binary representation for type net.neoforged.neoforge.client.model.ExtraFaceData
+Failed to create binary representation for type net.neoforged.neoforge.network.connection.ConnectionType
+Failed to create binary representation for type net.neoforged.neoforge.client.RenderTypeGroup
+Failed to create binary representation for type net.neoforged.neoforge.registries.datamaps.DataMapType<T,A>
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:208 targeting record class net.minecraft.core.RegistrySynchronization$NetworkedRegistryData attempts to widen its access without widening the constructor's access. You must AT the constructor too: "public net.minecraft.core.RegistrySynchronization$NetworkedRegistryData <init>(Lnet/minecraft/resources/ResourceKey;Lcom/mojang/serialization/Codec;)V"
+Failed to create binary representation for type net.neoforged.neoforge.common.data.ExistingFileHelper
+Failed to create binary representation for type net.neoforged.neoforge.common.data.ExistingFileHelper
+Failed to create binary representation for type net.neoforged.neoforge.common.data.ExistingFileHelper
+Failed to create binary representation for type net.neoforged.neoforge.common.data.ExistingFileHelper
+Failed to create binary representation for type net.neoforged.neoforge.network.connection.ConnectionType
+Failed to create binary representation for type net.neoforged.neoforge.network.connection.ConnectionType
+Failed to create binary representation for type net.neoforged.neoforge.common.util.ITeleporter
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:277 targeting record class net.minecraft.util.datafix.fixes.StructuresBecomeConfiguredFix$Conversion attempts to widen its access without widening the constructor's access. You must AT the constructor too: "public net.minecraft.util.datafix.fixes.StructuresBecomeConfiguredFix$Conversion <init>(Ljava/util/Map;Ljava/lang/String;)V"
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:258 targeting record class net.minecraft.server.MinecraftServer$ReloadableResources attempts to widen its access without widening the constructor's access. You must AT the constructor too: "public net.minecraft.server.MinecraftServer$ReloadableResources <init>(Lnet/minecraft/server/packs/resources/CloseableResourceManager;Lnet/minecraft/server/ReloadableServerResources;)V"
+Failed to create binary representation for type net.neoforged.neoforge.fluids.FluidType
+Failed to create binary representation for type net.neoforged.neoforge.capabilities.ICapabilityInvalidationListener
+Failed to create binary representation for type net.neoforged.neoforge.common.util.ITeleporter
+Failed to create binary representation for type net.neoforged.neoforge.fluids.FluidType
+Failed to create binary representation for type net.neoforged.neoforge.fluids.FluidType
+Failed to create binary representation for type net.neoforged.neoforge.fluids.FluidType
+Failed to create binary representation for type net.neoforged.neoforge.fluids.FluidType
+Failed to create binary representation for type net.neoforged.neoforge.attachment.AttachmentType<T>
+Failed to create binary representation for type net.neoforged.neoforge.capabilities.EntityCapability<T,C>
+Failed to create binary representation for type net.neoforged.neoforge.capabilities.EntityCapability<T,Void>
+Failed to create binary representation for type net.neoforged.neoforge.common.ToolAction
+Failed to create binary representation for type net.neoforged.neoforge.common.ToolAction
+Failed to create binary representation for type net.neoforged.neoforge.common.ToolAction
+Failed to create binary representation for type net.neoforged.neoforge.common.crafting.IngredientType<?>
+Access transformer PUBLIC MAKEFINAL C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:347 attempted to make toNetwork of net.minecraft.world.item.crafting.Ingredient final. Was non-final
+Failed to create binary representation for type net.neoforged.neoforge.common.PlantType
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:363 targeting record class net.minecraft.world.level.biome.Biome$ClimateSettings attempts to widen its access without widening the constructor's access. You must AT the constructor too: "public net.minecraft.world.level.biome.Biome$ClimateSettings <init>(ZFLnet/minecraft/world/level/biome/Biome$TemperatureModifier;F)V"
+Failed to create binary representation for type net.neoforged.neoforge.common.world.ModifiableBiomeInfo
+Failed to create binary representation for type net.neoforged.neoforge.common.IPlantable
+Failed to create binary representation for type net.neoforged.neoforge.client.model.data.ModelDataManager.Active
+Failed to create binary representation for type net.neoforged.neoforge.common.PlantType
+Failed to create binary representation for type net.neoforged.neoforge.common.PlantType
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:528, targeting net.minecraft.world.level.levelgen.NoiseGeneratorSettings METHOD lambda$static$0(Lcom/mojang/serialization/codecs/RecordCodecBuilder$Instance;)Lcom/mojang/datafixers/kinds/App; did not apply as its target doesn't exist
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:442, targeting net.minecraft.world.level.block.MelonBlock METHOD <init>(Lnet/minecraft/world/level/block/state/BlockBehaviour$Properties;)V did not apply as its target doesn't exist
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:235, targeting net.minecraft.data.recipes.ShapedRecipeBuilder INNERCLASS Result did not apply as its target doesn't exist
+Access transformer PUBLIC LEAVE C:\Users\cabca\Desktop\addon\build\tmp\neoformruntime\20260408-031244_transformSources\ats\accesstransformer.cfg:169, targeting net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher FIELD fontRenderer did not apply as its target doesn't exist

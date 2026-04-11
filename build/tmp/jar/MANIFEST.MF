@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Specification-Title: SCGuardGolem
+Specification-Version: 1.0.0
+Implementation-Title: SCGuardGolem
+Implementation-Version: 1.0.0
+Implementation-Timestamp: 2026-04-11T19:52:52-0400
+
