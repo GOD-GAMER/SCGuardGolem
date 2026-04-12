@@ -5,5 +5,12 @@
   "scguardgolem.conversion.success": "Iron Golem converted into a Security Guard Golem! You are now its owner.",
   "scguardgolem.manual.tooltip": "Right-click to view the user guide",
   "scguardgolem.command.no_golem": "No Security Golem found nearby.",
-  "scguardgolem.badge_check.halt": "Halt! Show your badge or leave the area."
+  "scguardgolem.badge_check.halt": "Halt! Show your badge or leave the area.",
+  "scguardgolem.gui.title": "Security Golem Configuration",
+  "scguardgolem.gui.modules": "Modules",
+  "scguardgolem.gui.loot": "Loot Chest",
+  "scguardgolem.gui.patrol_on": "Patrol: ON",
+  "scguardgolem.gui.patrol_off": "Patrol: OFF",
+  "scguardgolem.gui.camera_on": "Camera: ON",
+  "scguardgolem.gui.camera_off": "Camera: OFF"
 }

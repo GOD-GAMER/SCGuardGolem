@@ -6,18 +6,29 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
+import net.geforcemods.scguardgolem.SCGContent;
+import net.geforcemods.scguardgolem.SCGuardGolem;
 import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
+import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import net.geforcemods.securitycraft.SCContent;
+import net.geforcemods.securitycraft.components.ListModuleData;
+import net.geforcemods.securitycraft.items.ModuleItem;
+import net.geforcemods.securitycraft.misc.ModuleType;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -28,15 +39,20 @@ import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
@@ -46,25 +62,42 @@ public class SecurityGolemEntity extends IronGolem {
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> THREAT_MODE =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> HAS_CAMERA =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
+
+    // Module slots: 0=Harming, 1=Speed, 2=Smart, 3=Allowlist, 4=Denylist, 5=Storage
+    public static final int MODULE_SLOTS = 6;
+    public static final int SLOT_HARMING = 0;
+    public static final int SLOT_SPEED = 1;
+    public static final int SLOT_SMART = 2;
+    public static final int SLOT_ALLOWLIST = 3;
+    public static final int SLOT_DENYLIST = 4;
+    public static final int SLOT_STORAGE = 5;
+
+    public static final int MAX_UPGRADE_LEVEL = 5;
+    public static final int MAX_LOOT_ROWS = 6;
+    public static final int BASE_LOOT_SLOTS = 9;
+    public static final double BASE_DETECTION_RADIUS = 16.0;
+    public static final double DETECTION_RADIUS_PER_LEVEL = 4.0;
+    public static final double DAMAGE_PER_LEVEL = 3.0;
+    public static final double SPEED_PER_LEVEL = 0.03;
+
+    private final SimpleContainer moduleInventory = new SimpleContainer(MODULE_SLOTS) {
+        @Override
+        public void setChanged() {
+            super.setChanged();
+            onModulesChanged();
+        }
+    };
+    private SimpleContainer lootInventory = new SimpleContainer(BASE_LOOT_SLOTS);
 
     private final List<BlockPos> waypoints = new ArrayList<>();
     private List<BlockPos> waypointsView;
     private int currentWaypointIndex = 0;
     private double patrolSpeed = 1.0;
-    private final TreeSet<String> ignoreList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-    private final TreeSet<String> alwaysAttackList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-    private final Set<String> ignoreListView = Collections.unmodifiableSet(ignoreList);
-    private final Set<String> alwaysAttackListView = Collections.unmodifiableSet(alwaysAttackList);
 
-    private int damageUpgrade = 0;
-    private int speedUpgrade = 0;
-    private int detectionUpgrade = 0;
-
-    public static final int MAX_UPGRADE_LEVEL = 5;
-    public static final double BASE_DETECTION_RADIUS = 16.0;
-    public static final double DETECTION_RADIUS_PER_LEVEL = 4.0;
-    public static final double DAMAGE_PER_LEVEL = 3.0;
-    public static final double SPEED_PER_LEVEL = 0.03;
+    private String lootPassword = "";
+    private int pickupCooldown = 0;
 
     public enum ThreatMode {
         WARN, FOLLOW, ATTACK;
@@ -88,6 +121,7 @@ public class SecurityGolemEntity extends IronGolem {
         builder.define(OWNER_UUID, "");
         builder.define(OWNER_NAME, "");
         builder.define(THREAT_MODE, ThreatMode.WARN.ordinal());
+        builder.define(HAS_CAMERA, false);
     }
 
     @Override
@@ -112,10 +146,28 @@ public class SecurityGolemEntity extends IronGolem {
         if (!level().isClientSide()) {
             scanTimer++;
             if (scanTimer >= SCAN_INTERVAL_TICKS) scanTimer = 0;
+            if (pickupCooldown > 0) pickupCooldown--;
+            else pickupNearbyItems();
         }
     }
 
     public boolean isScanTick() { return scanTimer == 0; }
+
+    // -- MenuProvider --
+    @Override
+    public Component getDisplayName() {
+        return Component.translatable("scguardgolem.gui.title");
+    }
+
+    @Override
+    public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player player) {
+        return new GolemMenu(containerId, playerInv, this);
+    }
+
+    @Override
+    public void writeClientSideData(AbstractContainerMenu menu, net.minecraft.network.RegistryFriendlyByteBuf buf) {
+        buf.writeInt(this.getId());
+    }
 
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -125,10 +177,11 @@ public class SecurityGolemEntity extends IronGolem {
                 player.sendSystemMessage(Component.literal("  Patrol: " + (isPatrolling() ? "\u00a7aActive" : "\u00a7cStopped")
                         + " \u00a7f(" + waypoints.size() + " waypoints)"));
                 player.sendSystemMessage(Component.literal("  Threat Mode: \u00a7e" + getThreatMode().name()));
-                player.sendSystemMessage(Component.literal("  Upgrades \u2014 DMG:" + damageUpgrade
-                        + " SPD:" + speedUpgrade + " DET:" + detectionUpgrade));
-                player.sendSystemMessage(Component.literal("  Ignore list: " + ignoreList.size()
-                        + " | Attack list: " + alwaysAttackList.size()));
+                player.sendSystemMessage(Component.literal("  Modules: Harming=" + getModuleCount(SLOT_HARMING)
+                        + " Speed=" + getModuleCount(SLOT_SPEED)
+                        + " Smart=" + getModuleCount(SLOT_SMART)));
+                player.sendSystemMessage(Component.literal("  Camera: " + (hasCamera() ? "\u00a7aInstalled" : "\u00a7cNone")
+                        + " \u00a7f| Loot: " + getLootItemCount() + " items"));
                 return InteractionResult.SUCCESS;
             } else {
                 player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
@@ -148,6 +201,145 @@ public class SecurityGolemEntity extends IronGolem {
         String uuid = getOwnerUUID();
         return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
     }
+
+    // -- Module Inventory --
+    public SimpleContainer getModuleInventory() { return moduleInventory; }
+
+    public int getModuleCount(int slot) {
+        ItemStack stack = moduleInventory.getItem(slot);
+        return stack.isEmpty() ? 0 : Math.min(stack.getCount(), MAX_UPGRADE_LEVEL);
+    }
+
+    public static ModuleType getExpectedModuleType(int slot) {
+        return switch (slot) {
+            case SLOT_HARMING -> ModuleType.HARMING;
+            case SLOT_SPEED -> ModuleType.SPEED;
+            case SLOT_SMART -> ModuleType.SMART;
+            case SLOT_ALLOWLIST -> ModuleType.ALLOWLIST;
+            case SLOT_DENYLIST -> ModuleType.DENYLIST;
+            case SLOT_STORAGE -> ModuleType.STORAGE;
+            default -> null;
+        };
+    }
+
+    public static boolean isValidModuleForSlot(int slot, ItemStack stack) {
+        if (stack.isEmpty()) return true;
+        if (!(stack.getItem() instanceof ModuleItem moduleItem)) return false;
+        ModuleType expected = getExpectedModuleType(slot);
+        return expected != null && moduleItem.getModuleType() == expected;
+    }
+
+    private void onModulesChanged() {
+        if (level() != null && !level().isClientSide()) {
+            applyUpgrades();
+            resizeLootInventory();
+        }
+    }
+
+    // -- Module-driven upgrades --
+    public int getDamageUpgrade() { return getModuleCount(SLOT_HARMING); }
+    public int getSpeedUpgrade() { return getModuleCount(SLOT_SPEED); }
+    public int getDetectionUpgrade() { return getModuleCount(SLOT_SMART); }
+    public double getEffectiveDetectionRadius() { return BASE_DETECTION_RADIUS + getDetectionUpgrade() * DETECTION_RADIUS_PER_LEVEL; }
+
+    private void applyUpgrades() {
+        AttributeInstance a = getAttribute(Attributes.ATTACK_DAMAGE);
+        if (a != null) a.setBaseValue(15.0D + getDamageUpgrade() * DAMAGE_PER_LEVEL);
+        AttributeInstance s = getAttribute(Attributes.MOVEMENT_SPEED);
+        if (s != null) s.setBaseValue(0.25D + getSpeedUpgrade() * SPEED_PER_LEVEL);
+    }
+
+    // -- Module-driven player lists --
+    public boolean isOnIgnoreList(String playerName) {
+        ItemStack stack = moduleInventory.getItem(SLOT_ALLOWLIST);
+        if (stack.isEmpty()) return false;
+        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
+        return data != null && data.isPlayerOnList(playerName);
+    }
+
+    public boolean isOnAlwaysAttackList(String playerName) {
+        ItemStack stack = moduleInventory.getItem(SLOT_DENYLIST);
+        if (stack.isEmpty()) return false;
+        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
+        return data != null && data.isPlayerOnList(playerName);
+    }
+
+    public Set<String> getIgnoreListNames() {
+        ItemStack stack = moduleInventory.getItem(SLOT_ALLOWLIST);
+        if (stack.isEmpty()) return Set.of();
+        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
+        return data != null ? Set.copyOf(data.players()) : Set.of();
+    }
+
+    public Set<String> getAlwaysAttackListNames() {
+        ItemStack stack = moduleInventory.getItem(SLOT_DENYLIST);
+        if (stack.isEmpty()) return Set.of();
+        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
+        return data != null ? Set.copyOf(data.players()) : Set.of();
+    }
+
+    // -- Loot Inventory --
+    public SimpleContainer getLootInventory() { return lootInventory; }
+
+    public int getLootSlotCount() {
+        int storageLevel = getModuleCount(SLOT_STORAGE);
+        int rows = 1 + storageLevel;
+        return Math.min(rows, MAX_LOOT_ROWS) * 9;
+    }
+
+    public int getLootRows() {
+        return getLootSlotCount() / 9;
+    }
+
+    private void resizeLootInventory() {
+        int needed = getLootSlotCount();
+        if (lootInventory.getContainerSize() == needed) return;
+        SimpleContainer newInv = new SimpleContainer(needed);
+        for (int i = 0; i < Math.min(lootInventory.getContainerSize(), needed); i++) {
+            newInv.setItem(i, lootInventory.getItem(i));
+        }
+        for (int i = needed; i < lootInventory.getContainerSize(); i++) {
+            ItemStack overflow = lootInventory.getItem(i);
+            if (!overflow.isEmpty() && level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                spawnAtLocation(serverLevel, overflow);
+            }
+        }
+        lootInventory = newInv;
+    }
+
+    private int getLootItemCount() {
+        int count = 0;
+        for (int i = 0; i < lootInventory.getContainerSize(); i++)
+            if (!lootInventory.getItem(i).isEmpty()) count++;
+        return count;
+    }
+
+    // -- Loot Password --
+    public String getLootPassword() { return lootPassword; }
+    public void setLootPassword(String pw) { this.lootPassword = pw != null ? pw : ""; }
+    public boolean hasLootPassword() { return !lootPassword.isEmpty(); }
+
+    // -- Item Pickup --
+    private void pickupNearbyItems() {
+        if (getModuleCount(SLOT_STORAGE) <= 0) return;
+        AABB pickupBox = getBoundingBox().inflate(2.0);
+        List<ItemEntity> items = level().getEntitiesOfClass(ItemEntity.class, pickupBox);
+        for (ItemEntity itemEntity : items) {
+            if (!itemEntity.isAlive()) continue;
+            ItemStack stack = itemEntity.getItem();
+            ItemStack remainder = lootInventory.addItem(stack.copy());
+            if (remainder.isEmpty()) {
+                itemEntity.discard();
+            } else {
+                itemEntity.setItem(remainder);
+            }
+        }
+        pickupCooldown = 10;
+    }
+
+    // -- Camera --
+    public boolean hasCamera() { return entityData.get(HAS_CAMERA); }
+    public void setHasCamera(boolean c) { entityData.set(HAS_CAMERA, c); }
 
     // -- Patrol --
     public List<BlockPos> getWaypoints() {
@@ -178,30 +370,20 @@ public class SecurityGolemEntity extends IronGolem {
     public ThreatMode getThreatMode() { return ThreatMode.fromOrdinal(entityData.get(THREAT_MODE)); }
     public void setThreatMode(ThreatMode m) { entityData.set(THREAT_MODE, m.ordinal()); }
 
-    // -- Player Lists --
-    public Set<String> getIgnoreList() { return ignoreListView; }
-    public boolean addToIgnoreList(String n) { return ignoreList.add(n); }
-    public boolean removeFromIgnoreList(String n) { return ignoreList.remove(n); }
-    public boolean isOnIgnoreList(String n) { return ignoreList.contains(n); }
-    public Set<String> getAlwaysAttackList() { return alwaysAttackListView; }
-    public boolean addToAlwaysAttackList(String n) { return alwaysAttackList.add(n); }
-    public boolean removeFromAlwaysAttackList(String n) { return alwaysAttackList.remove(n); }
-    public boolean isOnAlwaysAttackList(String n) { return alwaysAttackList.contains(n); }
-
-    // -- Upgrades --
-    public int getDamageUpgrade() { return damageUpgrade; }
-    public int getSpeedUpgrade() { return speedUpgrade; }
-    public int getDetectionUpgrade() { return detectionUpgrade; }
-    public void setDamageUpgrade(int l) { damageUpgrade = Math.max(0, Math.min(l, MAX_UPGRADE_LEVEL)); applyUpgrades(); }
-    public void setSpeedUpgrade(int l) { speedUpgrade = Math.max(0, Math.min(l, MAX_UPGRADE_LEVEL)); applyUpgrades(); }
-    public void setDetectionUpgrade(int l) { detectionUpgrade = Math.max(0, Math.min(l, MAX_UPGRADE_LEVEL)); }
-    public double getEffectiveDetectionRadius() { return BASE_DETECTION_RADIUS + detectionUpgrade * DETECTION_RADIUS_PER_LEVEL; }
-
-    private void applyUpgrades() {
-        AttributeInstance a = getAttribute(Attributes.ATTACK_DAMAGE);
-        if (a != null) a.setBaseValue(15.0D + damageUpgrade * DAMAGE_PER_LEVEL);
-        AttributeInstance s = getAttribute(Attributes.MOVEMENT_SPEED);
-        if (s != null) s.setBaseValue(0.25D + speedUpgrade * SPEED_PER_LEVEL);
+    // -- Drop everything on death --
+    @Override
+    protected void dropAllDeathLoot(net.minecraft.server.level.ServerLevel level, net.minecraft.world.damagesource.DamageSource source) {
+        super.dropAllDeathLoot(level, source);
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack stack = moduleInventory.getItem(i);
+            if (!stack.isEmpty()) spawnAtLocation(level, stack);
+        }
+        moduleInventory.clearContent();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack stack = lootInventory.getItem(i);
+            if (!stack.isEmpty()) spawnAtLocation(level, stack);
+        }
+        lootInventory.clearContent();
     }
 
     // -- Persistence --
@@ -213,6 +395,9 @@ public class SecurityGolemEntity extends IronGolem {
         tag.putBoolean("Patrolling", isPatrolling());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
+        tag.putInt("ThreatMode", getThreatMode().ordinal());
+        tag.putBoolean("HasCamera", hasCamera());
+        tag.putString("LootPassword", lootPassword);
 
         CompoundTag waypointTag = new CompoundTag();
         waypointTag.putInt("Count", waypoints.size());
@@ -224,27 +409,8 @@ public class SecurityGolemEntity extends IronGolem {
         }
         tag.store("Waypoints", CompoundTag.CODEC, waypointTag);
 
-        tag.putInt("ThreatMode", getThreatMode().ordinal());
-        tag.putInt("DamageUpgrade", damageUpgrade);
-        tag.putInt("SpeedUpgrade", speedUpgrade);
-        tag.putInt("DetectionUpgrade", detectionUpgrade);
-
-        CompoundTag listsTag = new CompoundTag();
-        ListTag ignoreTag = new ListTag();
-        for (String name : ignoreList) {
-            CompoundTag e = new CompoundTag();
-            e.putString("Name", name);
-            ignoreTag.add(e);
-        }
-        listsTag.put("IgnoreList", ignoreTag);
-        ListTag attackTag = new ListTag();
-        for (String name : alwaysAttackList) {
-            CompoundTag e = new CompoundTag();
-            e.putString("Name", name);
-            attackTag.add(e);
-        }
-        listsTag.put("AlwaysAttackList", attackTag);
-        tag.store("PlayerLists", CompoundTag.CODEC, listsTag);
+        moduleInventory.storeAsItemList(tag.list("Modules", ItemStack.CODEC));
+        lootInventory.storeAsItemList(tag.list("LootItems", ItemStack.CODEC));
     }
 
     @Override
@@ -255,6 +421,9 @@ public class SecurityGolemEntity extends IronGolem {
         entityData.set(PATROLLING, tag.getBooleanOr("Patrolling", false));
         patrolSpeed = tag.getDoubleOr("PatrolSpeed", 1.0);
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
+        entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
+        entityData.set(HAS_CAMERA, tag.getBooleanOr("HasCamera", false));
+        lootPassword = tag.getStringOr("LootPassword", "");
 
         waypoints.clear();
         waypointsView = null;
@@ -264,28 +433,14 @@ public class SecurityGolemEntity extends IronGolem {
                 waypoints.add(new BlockPos(wc.getIntOr("X" + i, 0), wc.getIntOr("Y" + i, 0), wc.getIntOr("Z" + i, 0)));
         });
 
-        entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
-        damageUpgrade = tag.getIntOr("DamageUpgrade", 0);
-        speedUpgrade = tag.getIntOr("SpeedUpgrade", 0);
-        detectionUpgrade = tag.getIntOr("DetectionUpgrade", 0);
-        applyUpgrades();
+        moduleInventory.clearContent();
+        moduleInventory.fromItemList(tag.listOrEmpty("Modules", ItemStack.CODEC));
 
-        ignoreList.clear();
-        alwaysAttackList.clear();
-        tag.read("PlayerLists", CompoundTag.CODEC).ifPresent(lc -> {
-            lc.getListOrEmpty("IgnoreList").forEach(e -> {
-                if (e instanceof CompoundTag ct) {
-                    String n = ct.getStringOr("Name", "");
-                    if (!n.isEmpty()) ignoreList.add(n);
-                }
-            });
-            lc.getListOrEmpty("AlwaysAttackList").forEach(e -> {
-                if (e instanceof CompoundTag ct) {
-                    String n = ct.getStringOr("Name", "");
-                    if (!n.isEmpty()) alwaysAttackList.add(n);
-                }
-            });
-        });
+        applyUpgrades();
+        resizeLootInventory();
+
+        lootInventory.clearContent();
+        lootInventory.fromItemList(tag.listOrEmpty("LootItems", ItemStack.CODEC));
 
         if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
     }
