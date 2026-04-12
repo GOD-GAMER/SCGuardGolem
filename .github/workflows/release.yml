@@ -10,7 +10,11 @@ on:
         required: true
         type: choice
         options:
+          - mc26.1-v1.1.0
+          - mc1.21.11-v1.1.0
           - mc1.21.10-v1.1.0
+          - mc1.21.8-v1.1.0
+          - mc1.21.1-v1.1.0
           - mc1.20.4-v1.1.0
           - mc1.20.1-v1.1.0
           - mc1.21.10-v1.0.1
@@ -40,6 +44,7 @@ jobs:
           # Map to CurseForge-recognized MC version
           case "$MC" in
             "1.21.10") CF_MC="1.21.1" ;;
+            "26.1") CF_MC="26.1.1" ;;
             *) CF_MC="$MC" ;;
           esac
           echo "mc_version=$CF_MC" >> "$GITHUB_OUTPUT"
