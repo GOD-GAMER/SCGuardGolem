@@ -2,7 +2,6 @@ package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
-import net.geforcemods.securitycraft.api.Owner;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -88,18 +87,11 @@ public class SCGuardGolem {
     }
 
     /**
-     * Check whether a player is the same as the golem owner via
-     * SecurityCraft's Owner UUID comparison.
+     * Check whether a player is the same as the golem owner via UUID comparison.
      */
     public static boolean isPlayerTrustedByOwner(String playerUUID, String playerName,
                                                   String ownerUUID, String ownerName) {
         if (!scLoaded || ownerUUID == null || ownerUUID.isEmpty()) return false;
-        try {
-            Owner golemOwner = new Owner(ownerName, ownerUUID);
-            Owner playerOwner = new Owner(playerName, playerUUID);
-            return golemOwner.getUUID().equals(playerOwner.getUUID());
-        } catch (NoClassDefFoundError | Exception e) {
-            return false;
-        }
+        return ownerUUID.equals(playerUUID);
     }
 }
