@@ -45,7 +45,7 @@ public class BadgeCheckGoal extends Goal {
             if (golem.isOwner(player)) continue;
 
             if (SCGuardGolem.isPlayerTrustedByOwner(
-                    player.getGameProfile().id().toString(),
+                    player.getUUID().toString(),
                     playerName,
                     golem.getOwnerUUID(),
                     golem.getOwnerName())) continue;

@@ -133,14 +133,14 @@ public class SecurityGolemEntity extends IronGolem {
 
     // -- Owner --
     public void setGolemOwner(Player player) {
-        entityData.set(OWNER_UUID, player.getGameProfile().id().toString());
+        entityData.set(OWNER_UUID, player.getUUID().toString());
         entityData.set(OWNER_NAME, player.getName().getString());
     }
     public String getOwnerUUID() { return entityData.get(OWNER_UUID); }
     public String getOwnerName() { return entityData.get(OWNER_NAME); }
     public boolean isOwner(Player player) {
         String uuid = getOwnerUUID();
-        return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
+        return !uuid.isEmpty() && uuid.equals(player.getUUID().toString());
     }
 
     // -- Patrol --

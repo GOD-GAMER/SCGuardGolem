@@ -12,6 +12,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
@@ -44,7 +45,7 @@ public class SCGContent {
 
     public static final DeferredItem<SCGManualItem> SCG_MANUAL =
             ITEMS.registerItem("scg_manual", SCGManualItem::new,
-                    p -> p.stacksTo(1)
+                    new Item.Properties().stacksTo(1)
                             .component(DataComponents.WRITTEN_BOOK_CONTENT,
                                     SCGManualItem.buildManualContent()));
 
