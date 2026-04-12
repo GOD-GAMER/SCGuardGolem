@@ -68,7 +68,7 @@ jobs:
           gh release upload "${{ steps.meta.outputs.tag }}" "$JAR" --clobber
 
       - name: Publish to CurseForge
-        if: vars.CURSEFORGE_PROJECT_ID != '' && secrets.CURSEFORGE_TOKEN != ''
+        if: ${{ vars.CURSEFORGE_PROJECT_ID != '' }}
         env:
           CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
         run: ./gradlew curseforge -PcurseforgeProjectId=${{ vars.CURSEFORGE_PROJECT_ID }} --no-daemon
