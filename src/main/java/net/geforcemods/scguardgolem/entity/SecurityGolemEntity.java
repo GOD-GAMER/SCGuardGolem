@@ -96,7 +96,7 @@ public class SecurityGolemEntity extends IronGolem {
         this.targetSelector.addGoal(2, new PlayerThreatGoal(this));
         this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
                 net.minecraft.world.entity.Mob.class, 5, false, false,
-                (entity, level) -> entity instanceof Enemy && !(entity instanceof Creeper)));
+                entity -> entity instanceof Enemy && !(entity instanceof Creeper)));
     }
 
     @Override
@@ -132,14 +132,14 @@ public class SecurityGolemEntity extends IronGolem {
 
     // -- Owner --
     public void setGolemOwner(Player player) {
-        entityData.set(OWNER_UUID, player.getGameProfile().id().toString());
+        entityData.set(OWNER_UUID, player.getUUID().toString());
         entityData.set(OWNER_NAME, player.getName().getString());
     }
     public String getOwnerUUID() { return entityData.get(OWNER_UUID); }
     public String getOwnerName() { return entityData.get(OWNER_NAME); }
     public boolean isOwner(Player player) {
         String uuid = getOwnerUUID();
-        return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
+        return !uuid.isEmpty() && uuid.equals(player.getUUID().toString());
     }
 
     // -- Patrol --

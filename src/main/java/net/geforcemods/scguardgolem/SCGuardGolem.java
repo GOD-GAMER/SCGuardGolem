@@ -7,7 +7,6 @@ import net.geforcemods.securitycraft.items.KeycardItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -58,8 +57,7 @@ public class SCGuardGolem {
         if (!isKeycardItem(held)) return;
 
         ServerLevel serverLevel = (ServerLevel) event.getLevel();
-        SecurityGolemEntity golem = SCGContent.SECURITY_GOLEM.get()
-                .create(serverLevel, null, null, ironGolem.blockPosition(), MobSpawnType.CONVERSION, false, false);
+        SecurityGolemEntity golem = new SecurityGolemEntity(SCGContent.SECURITY_GOLEM.get(), serverLevel);
         if (golem == null) return;
 
         golem.moveTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
