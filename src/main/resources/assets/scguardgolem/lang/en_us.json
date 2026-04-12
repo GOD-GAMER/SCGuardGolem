@@ -1,12 +1,16 @@
 {
   "entity.scguardgolem.security_golem": "Security Guard Golem",
-  "entity.scguardgolem.golem_camera": "Golem Camera",
   "item.scguardgolem.scg_manual": "Security Golem Manual",
   "itemGroup.scguardgolem": "Security Guard Golem",
   "scguardgolem.conversion.success": "Iron Golem converted into a Security Guard Golem! You are now its owner.",
   "scguardgolem.manual.tooltip": "Right-click to view the user guide",
   "scguardgolem.command.no_golem": "No Security Golem found nearby.",
   "scguardgolem.badge_check.halt": "Halt! Show your badge or leave the area.",
-  "gui.scguardgolem.golem_config": "Security Golem Configuration",
-  "gui.scguardgolem.golem_loot": "Security Golem Loot"
+  "scguardgolem.gui.title": "Security Golem Configuration",
+  "scguardgolem.gui.modules": "Modules",
+  "scguardgolem.gui.loot": "Loot Chest",
+  "scguardgolem.gui.patrol_on": "Patrol: ON",
+  "scguardgolem.gui.patrol_off": "Patrol: OFF",
+  "scguardgolem.gui.camera_on": "Camera: ON",
+  "scguardgolem.gui.camera_off": "Camera: OFF"
 }
