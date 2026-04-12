@@ -10,6 +10,13 @@ on:
         required: true
         type: choice
         options:
+          - mc26.1-v1.1.1
+          - mc1.21.11-v1.1.1
+          - mc1.21.10-v1.1.1
+          - mc1.21.8-v1.1.1
+          - mc1.21.1-v1.1.1
+          - mc1.20.4-v1.1.1
+          - mc1.20.1-v1.1.1
           - mc26.1-v1.1.0
           - mc1.21.11-v1.1.0
           - mc1.21.10-v1.1.0
@@ -83,4 +90,4 @@ jobs:
           game-versions: ${{ steps.meta.outputs.mc_version }}
           loaders: ${{ steps.meta.outputs.loader }}
           name: "SCGuardGolem v${{ steps.meta.outputs.mod_version }} [MC ${{ steps.meta.outputs.mc_version }}]"
-          changelog: "Initial release. Features: Security Guard Golem, patrol system, threat modes (WARN/FOLLOW/ATTACK), upgrades, player lists, in-game manual, /scgolem commands."
+          changelog: "Optimization pass: TreeSet player lists for O(log n) case-insensitive lookups, cached unmodifiable views, direct UUID comparison, fixed case-sensitivity bug."
