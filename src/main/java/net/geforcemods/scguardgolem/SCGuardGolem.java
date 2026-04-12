@@ -2,6 +2,7 @@ package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.geforcemods.scguardgolem.network.SCGNetwork;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +17,7 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
@@ -23,15 +25,20 @@ import com.mojang.logging.LogUtils;
 @Mod(SCGuardGolem.MODID)
 public class SCGuardGolem {
     public static final String MODID = "scguardgolem";
-    public static final String VERSION = "1.1.0";
+    public static final String VERSION = "1.2.0";
     public static final Logger LOGGER = LogUtils.getLogger();
     public static boolean scLoaded;
 
     public SCGuardGolem() {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(FMLJavaModLoadingContext.get().getModEventBus());
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
         MinecraftForge.EVENT_BUS.register(this);
         LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.20.1)");
+    }
+
+    private void commonSetup(final FMLCommonSetupEvent event) {
+        SCGNetwork.register();
     }
 
     @SubscribeEvent
@@ -39,6 +46,10 @@ public class SCGuardGolem {
         SCGCommands.register(event.getDispatcher());
     }
 
+    /**
+     * Right-click a vanilla Iron Golem with any SecurityCraft keycard to
+     * convert it into a Security Guard Golem.
+     */
     @SubscribeEvent
     public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getLevel().isClientSide()) return;
