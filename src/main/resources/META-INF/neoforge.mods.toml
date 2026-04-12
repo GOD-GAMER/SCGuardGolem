@@ -1,0 +1,32 @@
+license = "MIT"
+
+[[mods]]
+modId = "scguardgolem"
+version = "${file.jarVersion}"
+displayName = "SecurityCraft Guard Golem"
+description = '''
+A SecurityCraft addon that adds a Security Guard Golem entity with patrol routes,
+badge-based player detection, configurable combat behavior, and player target lists.
+'''
+authors = "SCGuardGolem Team"
+
+[[dependencies.scguardgolem]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.8,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.scguardgolem]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.8,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.scguardgolem]]
+modId = "securitycraft"
+type = "required"
+versionRange = "[1.10.0,)"
+ordering = "AFTER"
+side = "BOTH"
