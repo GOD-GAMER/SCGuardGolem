@@ -3,6 +3,8 @@ package net.geforcemods.scguardgolem.entity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
@@ -46,10 +48,13 @@ public class SecurityGolemEntity extends IronGolem {
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.INT);
 
     private final List<BlockPos> waypoints = new ArrayList<>();
+    private List<BlockPos> waypointsView;
     private int currentWaypointIndex = 0;
     private double patrolSpeed = 1.0;
-    private final List<String> ignoreList = new ArrayList<>();
-    private final List<String> alwaysAttackList = new ArrayList<>();
+    private final TreeSet<String> ignoreList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    private final TreeSet<String> alwaysAttackList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    private final Set<String> ignoreListView = Collections.unmodifiableSet(ignoreList);
+    private final Set<String> alwaysAttackListView = Collections.unmodifiableSet(alwaysAttackList);
 
     private int damageUpgrade = 0;
     private int speedUpgrade = 0;
@@ -145,17 +150,22 @@ public class SecurityGolemEntity extends IronGolem {
     }
 
     // -- Patrol --
-    public List<BlockPos> getWaypoints() { return Collections.unmodifiableList(waypoints); }
-    public void addWaypoint(BlockPos pos) { waypoints.add(pos); }
+    public List<BlockPos> getWaypoints() {
+        List<BlockPos> v = waypointsView;
+        if (v == null || v.size() != waypoints.size()) { v = Collections.unmodifiableList(new ArrayList<>(waypoints)); waypointsView = v; }
+        return v;
+    }
+    public void addWaypoint(BlockPos pos) { waypoints.add(pos); waypointsView = null; }
     public boolean removeWaypoint(int index) {
         if (index >= 0 && index < waypoints.size()) {
             waypoints.remove(index);
+            waypointsView = null;
             if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
             return true;
         }
         return false;
     }
-    public void clearWaypoints() { waypoints.clear(); currentWaypointIndex = 0; }
+    public void clearWaypoints() { waypoints.clear(); waypointsView = null; currentWaypointIndex = 0; }
     public BlockPos getCurrentWaypoint() { return waypoints.isEmpty() ? null : waypoints.get(currentWaypointIndex); }
     public void advanceWaypoint() { if (!waypoints.isEmpty()) currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.size(); }
     public int getCurrentWaypointIndex() { return currentWaypointIndex; }
@@ -169,14 +179,14 @@ public class SecurityGolemEntity extends IronGolem {
     public void setThreatMode(ThreatMode m) { entityData.set(THREAT_MODE, m.ordinal()); }
 
     // -- Player Lists --
-    public List<String> getIgnoreList() { return Collections.unmodifiableList(ignoreList); }
-    public boolean addToIgnoreList(String n) { if (!ignoreList.contains(n)) { ignoreList.add(n); return true; } return false; }
+    public Set<String> getIgnoreList() { return ignoreListView; }
+    public boolean addToIgnoreList(String n) { return ignoreList.add(n); }
     public boolean removeFromIgnoreList(String n) { return ignoreList.remove(n); }
-    public boolean isOnIgnoreList(String n) { return ignoreList.stream().anyMatch(n::equalsIgnoreCase); }
-    public List<String> getAlwaysAttackList() { return Collections.unmodifiableList(alwaysAttackList); }
-    public boolean addToAlwaysAttackList(String n) { if (!alwaysAttackList.contains(n)) { alwaysAttackList.add(n); return true; } return false; }
+    public boolean isOnIgnoreList(String n) { return ignoreList.contains(n); }
+    public Set<String> getAlwaysAttackList() { return alwaysAttackListView; }
+    public boolean addToAlwaysAttackList(String n) { return alwaysAttackList.add(n); }
     public boolean removeFromAlwaysAttackList(String n) { return alwaysAttackList.remove(n); }
-    public boolean isOnAlwaysAttackList(String n) { return alwaysAttackList.stream().anyMatch(n::equalsIgnoreCase); }
+    public boolean isOnAlwaysAttackList(String n) { return alwaysAttackList.contains(n); }
 
     // -- Upgrades --
     public int getDamageUpgrade() { return damageUpgrade; }
@@ -247,6 +257,7 @@ public class SecurityGolemEntity extends IronGolem {
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
 
         waypoints.clear();
+        waypointsView = null;
         tag.read("Waypoints", CompoundTag.CODEC).ifPresent(wc -> {
             int count = wc.getIntOr("Count", 0);
             for (int i = 0; i < count; i++)
