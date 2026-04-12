@@ -3,6 +3,20 @@ name: Release & Publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build (e.g. mc/1.21.10)"
+        required: true
+        type: choice
+        options:
+          - mc/1.21.10
+          - mc/1.20.4
+          - mc/1.20.1
+      release_tag:
+        description: "Existing release tag to attach JAR to (e.g. mc1.21.10-v1.0.0)"
+        required: true
+        type: string
 
 jobs:
   build-and-publish:
@@ -11,11 +25,18 @@ jobs:
       contents: write
 
     steps:
-      - name: Determine branch from release target
+      - name: Determine branch and Java version
         id: meta
         run: |
-          BRANCH="${{ github.event.release.target_commitish }}"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            BRANCH="${{ github.event.release.target_commitish }}"
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            BRANCH="${{ inputs.branch }}"
+            TAG="${{ inputs.release_tag }}"
+          fi
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           if [[ "$BRANCH" == *"1.21"* ]]; then
             echo "java=21" >> "$GITHUB_OUTPUT"
           else
@@ -44,7 +65,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           JAR=$(ls build/libs/SecurityGolemAddon-*.jar | head -1)
-          gh release upload "${{ github.event.release.tag_name }}" "$JAR" --clobber
+          gh release upload "${{ steps.meta.outputs.tag }}" "$JAR" --clobber
 
       - name: Publish to CurseForge
         if: vars.CURSEFORGE_PROJECT_ID != '' && secrets.CURSEFORGE_TOKEN != ''
