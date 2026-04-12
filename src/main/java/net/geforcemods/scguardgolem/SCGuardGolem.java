@@ -2,7 +2,6 @@ package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
-import net.geforcemods.securitycraft.api.Owner;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -85,12 +84,6 @@ public class SCGuardGolem {
     public static boolean isPlayerTrustedByOwner(String playerUUID, String playerName,
                                                   String ownerUUID, String ownerName) {
         if (!scLoaded || ownerUUID == null || ownerUUID.isEmpty()) return false;
-        try {
-            Owner golemOwner = new Owner(ownerName, ownerUUID);
-            Owner playerOwner = new Owner(playerName, playerUUID);
-            return golemOwner.getUUID().equals(playerOwner.getUUID());
-        } catch (NoClassDefFoundError | Exception e) {
-            return false;
-        }
+        return ownerUUID.equals(playerUUID);
     }
 }
