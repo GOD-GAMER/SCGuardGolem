@@ -25,10 +25,11 @@ import net.minecraft.world.entity.ai.goal.MoveTowardsTargetGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
-import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -114,7 +115,7 @@ public class SecurityGolemEntity extends IronGolem {
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
-            if (isOwner(player) || player.hasPermissions(2)) {
+            if (isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7fStatus:"), false);
                 player.displayClientMessage(Component.literal("  Patrol: " + (isPatrolling() ? "\u00a7aActive" : "\u00a7cStopped")
                         + " \u00a7f(" + waypoints.size() + " waypoints)"), false);

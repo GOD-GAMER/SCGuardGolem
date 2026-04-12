@@ -6,11 +6,11 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
@@ -40,7 +40,7 @@ public class SCGContent {
                             .setUpdateInterval(3)
                             .setShouldReceiveVelocityUpdates(true)
                             .build(ResourceKey.create(Registries.ENTITY_TYPE,
-                                    ResourceLocation.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
 
     public static final DeferredItem<SCGManualItem> SCG_MANUAL =
             ITEMS.registerItem("scg_manual", SCGManualItem::new,
