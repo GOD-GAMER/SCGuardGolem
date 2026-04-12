@@ -77,11 +77,15 @@ cd SCGuardGolem
 
 ## Other Versions
 
-| Minecraft | Branch |
-|---|---|
-| **1.21.10** | [`mc/1.21.10`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.21.10) |
-| **1.20.4** | [`mc/1.20.4`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.20.4) |
-| **1.20.1** | [`mc/1.20.1`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.20.1) |
+| Minecraft | Mod Loader | Branch | SC Version |
+|---|---|---|---|
+| **26.1** | NeoForge 26.1 | [`mc/26.1`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/26.1) | 1.10.1-beta2 |
+| **1.21.11** | NeoForge 21.11 | [`mc/1.21.11`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.21.11) | 1.10.1-beta2 |
+| **1.21.10** | NeoForge 21.10 | [`mc/1.21.10`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.21.10) | 1.10.1 |
+| **1.21.8** | NeoForge 21.8 | [`mc/1.21.8`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.21.8) | 1.10.1 |
+| **1.21.1** | NeoForge 21.1 | [`mc/1.21.1`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.21.1) | 1.10.1 |
+| **1.20.4** | NeoForge 20.4 | [`mc/1.20.4`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.20.4) | 1.9.8+ |
+| **1.20.1** | Forge 47.1 | [`mc/1.20.1`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.20.1) | 1.9.8+ |
 
 ## License
 
