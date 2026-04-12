@@ -57,8 +57,18 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Debug - list workspace files
+        run: |
+          echo "=== Working directory ==="
+          pwd
+          echo "=== Top-level files ==="
+          ls -la
+          echo "=== Gradle files ==="
+          ls -la *.gradle* 2>/dev/null || echo "No .gradle files found"
+          ls -la gradle/wrapper/ 2>/dev/null || echo "No wrapper dir"
+
       - name: Build JAR
-        run: ./gradlew build --no-daemon
+        run: ./gradlew build --no-daemon --stacktrace
 
       - name: Upload JAR to GitHub Release
         env:
