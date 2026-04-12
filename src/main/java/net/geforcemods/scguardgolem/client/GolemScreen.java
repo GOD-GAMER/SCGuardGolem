@@ -1,305 +1,132 @@
 package net.geforcemods.scguardgolem.client;
 
-import java.util.List;
-
-import net.geforcemods.scguardgolem.SCGuardGolem;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
-import net.geforcemods.scguardgolem.entity.SecurityGolemEntity.ThreatMode;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
-import net.geforcemods.scguardgolem.network.ModifyWaypoint;
-import net.geforcemods.scguardgolem.network.SyncGolemSettings;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
 
-/**
- * Client-side GUI for the Security Guard Golem.
- * Tabs: Modules | Patrol | Settings
- */
 public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
-    private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(
-            SCGuardGolem.MODID, "textures/gui/golem_gui.png");
+    private static final Identifier CONTAINER_BG = Identifier.withDefaultNamespace("textures/gui/container/generic_54.png");
+    private static final Identifier SLOT_SPRITE = Identifier.withDefaultNamespace("container/slot");
 
-    private static final int TAB_MODULES = 0;
-    private static final int TAB_PATROL = 1;
-    private static final int TAB_SETTINGS = 2;
+    private static final int MODULE_LABEL_COLOR = 0xFF55FFFF;
+    private static final int SECTION_COLOR = 0xFFAAAAAA;
+    private static final int MODULE_AREA_HEIGHT = 48;
+    private static final int BUTTON_AREA_HEIGHT = 24;
+    private static final int GAP = 4;
 
-    private int currentTab = TAB_MODULES;
-
-    // Settings tab widgets
-    private EditBox passwordField;
-    private EditBox patrolSpeedField;
-    private Button threatModeButton;
-    private Button patrolToggleButton;
-    private Button cameraToggleButton;
-    private Button saveButton;
-
-    // Patrol tab widgets
-    private Button addWaypointButton;
-    private Button clearWaypointsButton;
-    private int waypointScrollOffset = 0;
-
-    // Tab buttons
-    private Button tabModulesBtn;
-    private Button tabPatrolBtn;
-    private Button tabSettingsBtn;
+    private Button patrolButton;
+    private Button threatButton;
+    private Button cameraButton;
 
     public GolemScreen(GolemMenu menu, Inventory playerInv, Component title) {
-        super(menu, playerInv, title);
-        this.imageWidth = 176;
-        this.imageHeight = 200;
+        super(menu, playerInv, title, 176, calculateHeight(menu.getLootRows()));
         this.inventoryLabelY = this.imageHeight - 94;
+    }
+
+    private static int calculateHeight(int lootRows) {
+        return 18 + MODULE_AREA_HEIGHT + GAP + BUTTON_AREA_HEIGHT + GAP
+                + lootRows * 18 + 14 + 90 + 4;
     }
 
     @Override
     protected void init() {
         super.init();
+        int x = leftPos + 98;
+        int y = topPos + 18;
 
+        patrolButton = addRenderableWidget(
+                Button.builder(getPatrolText(), btn -> {
+                    clickButton(0);
+                    btn.setMessage(getPatrolText());
+                }).bounds(x, y, 70, 18).build());
+
+        threatButton = addRenderableWidget(
+                Button.builder(getThreatText(), btn -> {
+                    clickButton(1);
+                    btn.setMessage(getThreatText());
+                }).bounds(x, y + 22, 70, 18).build());
+
+        cameraButton = addRenderableWidget(
+                Button.builder(getCameraText(), btn -> {
+                    clickButton(2);
+                    btn.setMessage(getCameraText());
+                }).bounds(x, y + 44, 70, 18).build());
+    }
+
+    private void clickButton(int id) {
+        if (minecraft != null && minecraft.gameMode != null) {
+            minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
+        }
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        extractTooltip(graphics, mouseX, mouseY);
+
+        // Update button labels each frame in case data changes
+        patrolButton.setMessage(getPatrolText());
+        threatButton.setMessage(getThreatText());
+        cameraButton.setMessage(getCameraText());
+    }
+
+    @Override
+    public void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
         int x = leftPos;
         int y = topPos;
 
-        // Tab buttons across the top
-        tabModulesBtn = addRenderableWidget(Button.builder(
-                Component.literal("Modules"), b -> switchTab(TAB_MODULES))
-                .bounds(x, y - 18, 58, 18).build());
-        tabPatrolBtn = addRenderableWidget(Button.builder(
-                Component.literal("Patrol"), b -> switchTab(TAB_PATROL))
-                .bounds(x + 59, y - 18, 58, 18).build());
-        tabSettingsBtn = addRenderableWidget(Button.builder(
-                Component.literal("Settings"), b -> switchTab(TAB_SETTINGS))
-                .bounds(x + 118, y - 18, 58, 18).build());
+        // Draw dark background panel
+        graphics.fill(x, y, x + imageWidth, y + imageHeight, 0xCC101010);
 
-        // --- Settings tab widgets ---
-        SecurityGolemEntity golem = menu.getGolem();
+        // Draw border
+        graphics.fill(x, y, x + imageWidth, y + 1, 0xFF555555);
+        graphics.fill(x, y + imageHeight - 1, x + imageWidth, y + imageHeight, 0xFF555555);
+        graphics.fill(x, y, x + 1, y + imageHeight, 0xFF555555);
+        graphics.fill(x + imageWidth - 1, y, x + imageWidth, y + imageHeight, 0xFF555555);
 
-        patrolSpeedField = new EditBox(font, x + 70, y + 26, 50, 16,
-                Component.literal("Patrol Speed"));
-        patrolSpeedField.setMaxLength(5);
-        patrolSpeedField.setValue(golem != null ? String.format("%.1f", golem.getPatrolSpeed()) : "1.0");
-        addWidget(patrolSpeedField);
+        // Module slot labels
+        String[] topLabels = {"Harming", "Speed", "Smart"};
+        String[] botLabels = {"Allowlist", "Denylist", "Storage"};
+        for (int i = 0; i < 3; i++) {
+            int slotX = x + 8 + i * 28;
+            graphics.text(font, topLabels[i], slotX, y + 8, MODULE_LABEL_COLOR, false);
+            graphics.text(font, botLabels[i], slotX, y + 30, MODULE_LABEL_COLOR, false);
+        }
 
-        passwordField = new EditBox(font, x + 70, y + 48, 96, 16,
-                Component.literal("Chest Password"));
-        passwordField.setMaxLength(16);
-        passwordField.setValue(golem != null ? golem.getChestPassword() : "");
-        addWidget(passwordField);
+        // Loot section label
+        int lootLabelY = y + 52;
+        graphics.text(font, "Loot Chest", x + 8, lootLabelY, SECTION_COLOR, false);
 
-        ThreatMode mode = golem != null ? golem.getThreatMode() : ThreatMode.WARN;
-        threatModeButton = addRenderableWidget(Button.builder(
-                Component.literal("Threat: " + mode.name()),
-                b -> cycleThreatMode())
-                .bounds(x + 8, y + 70, 80, 18).build());
-
-        boolean patrolling = golem != null && golem.isPatrolling();
-        patrolToggleButton = addRenderableWidget(Button.builder(
-                Component.literal("Patrol: " + (patrolling ? "ON" : "OFF")),
-                b -> togglePatrol())
-                .bounds(x + 90, y + 70, 78, 18).build());
-
-        boolean camEnabled = golem != null && golem.isCameraEnabled();
-        cameraToggleButton = addRenderableWidget(Button.builder(
-                Component.literal("Camera: " + (camEnabled ? "ON" : "OFF")),
-                b -> toggleCamera())
-                .bounds(x + 8, y + 92, 80, 18).build());
-
-        saveButton = addRenderableWidget(Button.builder(
-                Component.literal("Save Settings"),
-                b -> sendSettings())
-                .bounds(x + 90, y + 92, 78, 18).build());
-
-        // --- Patrol tab widgets ---
-        addWaypointButton = addRenderableWidget(Button.builder(
-                Component.literal("+ Add Here"),
-                b -> addWaypointHere())
-                .bounds(x + 8, y + 20, 76, 18).build());
-
-        clearWaypointsButton = addRenderableWidget(Button.builder(
-                Component.literal("Clear All"),
-                b -> clearWaypoints())
-                .bounds(x + 90, y + 20, 76, 18).build());
-
-        switchTab(TAB_MODULES);
-    }
-
-    private void switchTab(int tab) {
-        currentTab = tab;
-
-        boolean isMod = tab == TAB_MODULES;
-        boolean isPat = tab == TAB_PATROL;
-        boolean isSet = tab == TAB_SETTINGS;
-
-        // Settings widgets
-        patrolSpeedField.setVisible(isSet);
-        passwordField.setVisible(isSet);
-        threatModeButton.visible = isSet;
-        patrolToggleButton.visible = isSet;
-        cameraToggleButton.visible = isSet;
-        saveButton.visible = isSet;
-
-        // Patrol widgets
-        addWaypointButton.visible = isPat;
-        clearWaypointsButton.visible = isPat;
-
-        // Tab button emphasis
-        tabModulesBtn.active = !isMod;
-        tabPatrolBtn.active = !isPat;
-        tabSettingsBtn.active = !isSet;
-    }
-
-    private void cycleThreatMode() {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null) return;
-        ThreatMode[] modes = ThreatMode.values();
-        int next = (golem.getThreatMode().ordinal() + 1) % modes.length;
-        golem.setThreatMode(modes[next]);
-        threatModeButton.setMessage(Component.literal("Threat: " + modes[next].name()));
-    }
-
-    private void togglePatrol() {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null) return;
-        boolean newVal = !golem.isPatrolling();
-        golem.setPatrolling(newVal);
-        patrolToggleButton.setMessage(Component.literal("Patrol: " + (newVal ? "ON" : "OFF")));
-    }
-
-    private void toggleCamera() {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null) return;
-        boolean newVal = !golem.isCameraEnabled();
-        golem.setCameraEnabled(newVal);
-        cameraToggleButton.setMessage(Component.literal("Camera: " + (newVal ? "ON" : "OFF")));
-    }
-
-    private void sendSettings() {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null) return;
-
-        double speed = 1.0;
-        try {
-            speed = Double.parseDouble(patrolSpeedField.getValue());
-        } catch (NumberFormatException ignored) {}
-
-        ClientPacketDistributor.sendToServer(new SyncGolemSettings(
-                golem.getId(),
-                golem.getThreatMode().ordinal(),
-                speed,
-                golem.isPatrolling(),
-                passwordField.getValue(),
-                golem.isCameraEnabled()));
-    }
-
-    private void addWaypointHere() {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null || minecraft == null || minecraft.player == null) return;
-        BlockPos pos = minecraft.player.blockPosition();
-        ClientPacketDistributor.sendToServer(new ModifyWaypoint(golem.getId(), ModifyWaypoint.ACTION_ADD, pos));
-    }
-
-    private void clearWaypoints() {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null) return;
-        ClientPacketDistributor.sendToServer(new ModifyWaypoint(
-                golem.getId(), ModifyWaypoint.ACTION_CLEAR, BlockPos.ZERO));
+        // Player inventory background (draw the standard inventory sprite from vanilla)
+        int invY = y + imageHeight - 96;
+        graphics.blit(RenderPipelines.GUI_TEXTURED, CONTAINER_BG, x, invY, 0.0F, 126.0F, imageWidth, 96, 256, 256);
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, leftPos, topPos, 0.0F, 0.0F, imageWidth, imageHeight, 256, 256);
+    protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        graphics.text(this.font, this.title, this.titleLabelX, 0, 0xFF55FF55, false);
     }
 
-    @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        super.render(graphics, mouseX, mouseY, partialTick);
-
-        if (currentTab == TAB_SETTINGS) {
-            graphics.drawString(font, "Speed:", leftPos + 10, topPos + 30, 0x404040, false);
-            graphics.drawString(font, "Password:", leftPos + 10, topPos + 52, 0x404040, false);
-            patrolSpeedField.renderWidget(graphics, mouseX, mouseY, partialTick);
-            passwordField.renderWidget(graphics, mouseX, mouseY, partialTick);
-        }
-
-        if (currentTab == TAB_PATROL) {
-            renderWaypointList(graphics);
-        }
-
-        if (currentTab == TAB_MODULES) {
-            String[] labels = {"Allow", "Deny", "Harm", "Speed", "Smart", "Store"};
-            for (int i = 0; i < labels.length; i++) {
-                graphics.drawString(font, labels[i], leftPos + 13 + i * 26, topPos + 10, 0x404040, false);
-            }
-
-            int unlocked = menu.getUnlockedLootSlots();
-            String lootLabel = "Loot Storage (" + unlocked + "/" + GolemMenu.MAX_LOOT_SLOTS + " slots)";
-            graphics.drawString(font, lootLabel, leftPos + 8, topPos + 42, 0x404040, false);
-        }
-
-        renderTooltip(graphics, mouseX, mouseY);
+    private Component getPatrolText() {
+        boolean on = menu.getData().get(0) != 0;
+        return Component.literal("Patrol: " + (on ? "\u00a7aON" : "\u00a7cOFF"));
     }
 
-    private void renderWaypointList(GuiGraphics graphics) {
-        SecurityGolemEntity golem = menu.getGolem();
-        if (golem == null) return;
-
-        List<BlockPos> waypoints = golem.getWaypoints();
-        int y = topPos + 42;
-        graphics.drawString(font, "Waypoints (" + waypoints.size() + "):", leftPos + 8, y, 0x404040, false);
-        y += 12;
-
-        int maxVisible = 6;
-        for (int i = waypointScrollOffset; i < Math.min(waypoints.size(), waypointScrollOffset + maxVisible); i++) {
-            BlockPos wp = waypoints.get(i);
-            String text = (i + 1) + ". [" + wp.getX() + ", " + wp.getY() + ", " + wp.getZ() + "]";
-            graphics.drawString(font, text, leftPos + 12, y, 0x606060, false);
-            y += 11;
-        }
+    private Component getThreatText() {
+        int mode = menu.getData().get(1);
+        String name = SecurityGolemEntity.ThreatMode.fromOrdinal(mode).name();
+        return Component.literal("Mode: \u00a7e" + name);
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (currentTab == TAB_PATROL && menu.getGolem() != null) {
-            int maxOffset = Math.max(0, menu.getGolem().getWaypoints().size() - 6);
-            waypointScrollOffset = Math.max(0, Math.min(waypointScrollOffset - (int) scrollY, maxOffset));
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-    }
-
-    @Override
-    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
-        graphics.drawString(font, title, titleLabelX, titleLabelY, 0x404040, false);
-        if (currentTab == TAB_MODULES) {
-            graphics.drawString(font, playerInventoryTitle, inventoryLabelX, inventoryLabelY, 0x404040, false);
-        }
-    }
-
-    @Override
-    public boolean keyPressed(KeyEvent event) {
-        if (patrolSpeedField.isFocused() || passwordField.isFocused()) {
-            if (event.key() == 256) { // Escape
-                patrolSpeedField.setFocused(false);
-                passwordField.setFocused(false);
-                return true;
-            }
-            if (patrolSpeedField.isFocused())
-                return patrolSpeedField.keyPressed(event);
-            return passwordField.keyPressed(event);
-        }
-        return super.keyPressed(event);
-    }
-
-    @Override
-    public void removed() {
-        sendSettings();
-        super.removed();
+    private Component getCameraText() {
+        boolean on = menu.getData().get(2) != 0;
+        return Component.literal("Camera: " + (on ? "\u00a7aON" : "\u00a77OFF"));
     }
 }

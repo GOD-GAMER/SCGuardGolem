@@ -1,6 +1,5 @@
 package net.geforcemods.scguardgolem;
 
-import net.geforcemods.scguardgolem.entity.GolemCameraEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.geforcemods.scguardgolem.item.SCGManualItem;
@@ -13,7 +12,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.golem.IronGolem;
-import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -47,28 +45,17 @@ public class SCGContent {
                             .setUpdateInterval(3)
                             .setShouldReceiveVelocityUpdates(true)
                             .build(ResourceKey.create(Registries.ENTITY_TYPE,
-Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
-
-                                                            public static final DeferredHolder<EntityType<?>, EntityType<GolemCameraEntity>> GOLEM_CAMERA =
-                                                                    ENTITY_TYPES.register("golem_camera", () ->
-                                                                            EntityType.Builder.<GolemCameraEntity>of(GolemCameraEntity::new, MobCategory.MISC)
-                                                                                    .sized(0.0F, 0.0F)
-                                                                                    .setTrackingRange(64)
-                                                                                    .setUpdateInterval(1)
-                                                                                    .setShouldReceiveVelocityUpdates(false)
-                                                                                     .noSummon()
-                                                                                    .build(ResourceKey.create(Registries.ENTITY_TYPE,
-                                                                                            Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "golem_camera"))));
-
-                                                            public static final DeferredItem<SCGManualItem> SCG_MANUAL =
-            ITEMS.registerItem("scg_manual", SCGManualItem::new,
-                    p -> p.stacksTo(1)
-                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
-                                    SCGManualItem.buildManualContent()));
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
 
     public static final DeferredHolder<MenuType<?>, MenuType<GolemMenu>> GOLEM_MENU =
             MENU_TYPES.register("golem_menu", () ->
                     IMenuTypeExtension.create(GolemMenu::new));
+
+    public static final DeferredItem<SCGManualItem> SCG_MANUAL =
+            ITEMS.registerItem("scg_manual", SCGManualItem::new,
+                    p -> p.stacksTo(1)
+                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
+                                    SCGManualItem.buildManualContent()));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SCG_TAB =
             CREATIVE_MODE_TABS.register("scguardgolem", () -> CreativeModeTab.builder()
