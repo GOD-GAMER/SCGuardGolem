@@ -41,64 +41,83 @@ public class SCGManualItem extends Item {
 
         pages.add(StringTag.valueOf(Component.Serializer.toJson(
                 Component.empty()
-                        .append(Component.literal("\n\nSecurity Guard\nGolem Manual\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
+                        .append(Component.literal("\n\nSecurity Guard\nGolem Manual\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("v1.2.0\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
                         .append(Component.literal("A complete guide\nto creating and\ncommanding your\nSecurity Golem.\n\n").withStyle(ChatFormatting.GRAY))
                         .append(Component.literal("by SCGuardGolem").withStyle(ChatFormatting.GRAY)))));
 
         pages.add(StringTag.valueOf(Component.Serializer.toJson(
                 Component.empty()
-                        .append(Component.literal("Getting Started\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
-                        .append(Component.literal("1. Build a vanilla\n   Iron Golem\n\n2. Hold any SC\n   Keycard\n\n3. Right-click the\n   Iron Golem\n\n").withStyle(ChatFormatting.BLACK))
-                        .append(Component.literal("The keycard is\nconsumed and you\nbecome its owner.").withStyle(ChatFormatting.GRAY)))));
+                        .append(Component.literal("Getting Started\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("1. Place an Iron Golem\n\n2. Hold a SC Keycard\n\n3. Right-click the golem\n\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("The golem converts into\na Security Guard Golem\nowned by you.").withStyle(ChatFormatting.GRAY)))));
 
         pages.add(StringTag.valueOf(Component.Serializer.toJson(
                 Component.empty()
-                        .append(Component.literal("Patrol System\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
-                        .append(Component.literal("/scgolem patrol\n  start\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Begin patrol loop\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem patrol\n  stop\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Stop patrolling\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem patrol\n  speed <0.1-3.0>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Set patrol speed").withStyle(ChatFormatting.GRAY)))));
+                        .append(Component.literal("Opening the GUI\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("Hold SC ").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Wire Cutters").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("\nand right-click\nyour golem to open\nthe config GUI.\n\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("The GUI has 3 tabs:\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("- Modules\n- Patrol\n- Settings").withStyle(ChatFormatting.DARK_GREEN)))));
 
         pages.add(StringTag.valueOf(Component.Serializer.toJson(
                 Component.empty()
-                        .append(Component.literal("Waypoints\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
-                        .append(Component.literal("/scgolem patrol\n  waypoint addhere\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Add at your pos\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem patrol\n  waypoint add\n  <x> <y> <z>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Add at coords\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("  waypoint list\n  waypoint remove <#>\n  waypoint clear").withStyle(ChatFormatting.DARK_GREEN)))));
+                        .append(Component.literal("Module Upgrades\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("Place SC modules in\nthe 6 upgrade slots.\nStack count = level\n(1-5 per slot).\n\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Harming Module\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("+3 attack damage/lvl\n\n").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal("Speed Module\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("+0.03 move speed/lvl").withStyle(ChatFormatting.GRAY)))));
 
         pages.add(StringTag.valueOf(Component.Serializer.toJson(
                 Component.empty()
-                        .append(Component.literal("Threat Modes\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
-                        .append(Component.literal("/scgolem threat warn\n").withStyle(ChatFormatting.DARK_GREEN))
+                        .append(Component.literal("More Modules\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("Smart Module\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("+4 block detection\nradius per level\n\n").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal("Storage Module\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("+9 loot slots per\nlevel (max 27)\n\n").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal("Golem auto-collects\nnearby dropped items.").withStyle(ChatFormatting.GRAY)))));
+
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(
+                Component.empty()
+                        .append(Component.literal("Player Lists\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("Allowlist Module\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("= Don't Harm list\n\n").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal("Denylist Module\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("= Always Harm list\n\n").withStyle(ChatFormatting.GRAY))
+                        .append(Component.literal("Edit the SC module\nbefore placing it!").withStyle(ChatFormatting.BLACK)))));
+
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(
+                Component.empty()
+                        .append(Component.literal("Camera System\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("Enable camera from\nthe Settings tab.\n\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("When enabled, a\ncamera entity rides\nthe golem.\n\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Use the SC ").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Camera\nMonitor").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal(" to view the\ngolem's perspective.").withStyle(ChatFormatting.BLACK)))));
+
+        pages.add(StringTag.valueOf(Component.Serializer.toJson(
+                Component.empty()
+                        .append(Component.literal("Threat Modes\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("WARN\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
                         .append(Component.literal("Warn in chat\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem threat follow\n").withStyle(ChatFormatting.DARK_GREEN))
+                        .append(Component.literal("FOLLOW\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
                         .append(Component.literal("Follow untrusted\nplayers\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem threat attack\n").withStyle(ChatFormatting.DARK_GREEN))
+                        .append(Component.literal("ATTACK\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
                         .append(Component.literal("Attack untrusted\nplayers").withStyle(ChatFormatting.GRAY)))));
 
         pages.add(StringTag.valueOf(Component.Serializer.toJson(
                 Component.empty()
-                        .append(Component.literal("Upgrades (0-5)\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
-                        .append(Component.literal("/scgolem upgrade\n  damage <lvl>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("+3 damage/level\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem upgrade\n  speed <lvl>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("+0.03 speed/level\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem upgrade\n  detection <lvl>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("+4 block radius/lvl").withStyle(ChatFormatting.GRAY)))));
-
-        pages.add(StringTag.valueOf(Component.Serializer.toJson(
-                Component.empty()
-                        .append(Component.literal("Player Lists\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.DARK_AQUA)))
-                        .append(Component.literal("/scgolem list\n  ignore add <name>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Never attack\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("  attack add <name>\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("Always attack\n\n").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("/scgolem list show\n").withStyle(ChatFormatting.DARK_GREEN))
-                        .append(Component.literal("/scgolem status\n/scgolem setowner").withStyle(ChatFormatting.DARK_GREEN)))));
+                        .append(Component.literal("Quick Reference\n\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("Keycard").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal(" = Convert\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Wire Cutters").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal(" = GUI\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Shift+Empty").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal(" = Status\n\n").withStyle(ChatFormatting.BLACK))
+                        .append(Component.literal("Trust Priority:\n").withStyle(s -> s.withBold(true).withColor(ChatFormatting.GOLD)))
+                        .append(Component.literal("1. Denylist (attack)\n2. Allowlist (ignore)\n3. Owner (safe)\n4. Threat mode").withStyle(ChatFormatting.BLACK)))));
 
         tag.put("pages", pages);
     }

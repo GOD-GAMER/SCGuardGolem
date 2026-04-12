@@ -2,6 +2,9 @@ package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.geforcemods.scguardgolem.network.CheckChestPassword;
+import net.geforcemods.scguardgolem.network.ModifyWaypoint;
+import net.geforcemods.scguardgolem.network.SyncGolemSettings;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -17,13 +20,15 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlerEvent;
+import net.neoforged.neoforge.network.registration.IPayloadRegistrar;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 @Mod(SCGuardGolem.MODID)
 public class SCGuardGolem {
     public static final String MODID = "scguardgolem";
-    public static final String VERSION = "1.1.0";
+    public static final String VERSION = "1.2.0";
     public static final Logger LOGGER = LogUtils.getLogger();
     public static boolean scLoaded;
 
@@ -32,6 +37,7 @@ public class SCGuardGolem {
         SCGContent.register(modBus);
         NeoForge.EVENT_BUS.addListener(SCGuardGolem::onRegisterCommands);
         NeoForge.EVENT_BUS.addListener(SCGuardGolem::onEntityInteract);
+        modBus.addListener(SCGuardGolem::onRegisterPayloads);
         LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.20.4)");
     }
 
@@ -39,7 +45,18 @@ public class SCGuardGolem {
         SCGCommands.register(event.getDispatcher());
     }
 
-    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+public static void onRegisterPayloads(RegisterPayloadHandlerEvent event) {
+    final IPayloadRegistrar registrar = event.registrar(MODID).versioned("1.2.0");
+    registrar.play(SyncGolemSettings.ID, SyncGolemSettings::new, handler -> handler.server(SyncGolemSettings::handle));
+    registrar.play(ModifyWaypoint.ID, ModifyWaypoint::new, handler -> handler.server(ModifyWaypoint::handle));
+    registrar.play(CheckChestPassword.ID, CheckChestPassword::new, handler -> handler.server(CheckChestPassword::handle));
+}
+
+/**
+ * Right-click a vanilla Iron Golem with any SecurityCraft keycard to
+ * convert it into a Security Guard Golem.
+ */
+public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getTarget() instanceof IronGolem ironGolem)) return;
         if (event.getTarget() instanceof SecurityGolemEntity) return;
