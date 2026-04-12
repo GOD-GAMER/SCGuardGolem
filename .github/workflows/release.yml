@@ -1,80 +1,78 @@
-name: Release & Publish
+name: Publish to CurseForge
 
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
-      branch:
-        description: "Branch to build (e.g. mc/1.21.10)"
+      release_tag:
+        description: "Release tag to publish (e.g. mc1.21.10-v1.0.0)"
         required: true
         type: choice
         options:
-          - mc/1.21.10
-          - mc/1.20.4
-          - mc/1.20.1
-      release_tag:
-        description: "Existing release tag to attach JAR to (e.g. mc1.21.10-v1.0.0)"
-        required: true
-        type: string
+          - mc1.21.10-v1.0.0
+          - mc1.20.4-v1.0.0
+          - mc1.20.1-v1.0.0
 
 jobs:
-  build-and-publish:
+  publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
-      - name: Determine branch and Java version
+      - name: Parse release info
         id: meta
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            BRANCH="${{ github.event.release.target_commitish }}"
             TAG="${{ github.event.release.tag_name }}"
           else
-            BRANCH="${{ inputs.branch }}"
             TAG="${{ inputs.release_tag }}"
           fi
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          if [[ "$BRANCH" == *"1.21"* ]]; then
-            echo "java=21" >> "$GITHUB_OUTPUT"
-          else
-            echo "java=17" >> "$GITHUB_OUTPUT"
-          fi
 
-      - name: Checkout target branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.meta.outputs.branch }}
+          # Extract MC version: mc1.21.10-v1.0.0 -> 1.21.10
+          MC=$(echo "$TAG" | sed -E 's/^mc([0-9.]+)-v.*/\1/')
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ steps.meta.outputs.java }}
+          # Map to CurseForge-recognized MC version
+          case "$MC" in
+            "1.21.10") CF_MC="1.21.1" ;;
+            *) CF_MC="$MC" ;;
+          esac
+          echo "mc_version=$CF_MC" >> "$GITHUB_OUTPUT"
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+          # Determine mod loader
+          case "$MC" in
+            "1.20.1") echo "loader=forge" >> "$GITHUB_OUTPUT" ;;
+            *) echo "loader=neoforge" >> "$GITHUB_OUTPUT" ;;
+          esac
 
-      - name: Build JAR
-        run: |
-          echo "=== Gradle version ==="
-          ./gradlew --version
-          echo "=== Available tasks ==="
-          ./gradlew tasks --no-daemon 2>&1 | head -50
-          echo "=== Running build ==="
-          ./gradlew build --no-daemon --stacktrace
+          # Mod version: mc1.21.10-v1.0.0 -> 1.0.0
+          MOD_VER=$(echo "$TAG" | sed -E 's/^mc[0-9.]+-v//')
+          echo "mod_version=$MOD_VER" >> "$GITHUB_OUTPUT"
 
-      - name: Upload JAR to GitHub Release
+          echo "Resolved: tag=$TAG mc=$CF_MC mod=$MOD_VER"
+
+      - name: Download JAR from GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          JAR=$(ls build/libs/SecurityGolemAddon-*.jar | head -1)
-          gh release upload "${{ steps.meta.outputs.tag }}" "$JAR" --clobber
+          gh release download "${{ steps.meta.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "SecurityGolemAddon-*.jar" \
+            --dir .
+          echo "Downloaded:"
+          ls -la SecurityGolemAddon-*.jar
 
-      - name: Publish to CurseForge
-        if: ${{ vars.CURSEFORGE_PROJECT_ID != '' }}
-        env:
-          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-        run: ./gradlew curseforge -PcurseforgeProjectId=${{ vars.CURSEFORGE_PROJECT_ID }} --no-daemon
+      - name: Upload to CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: SecurityGolemAddon-*.jar
+          version: ${{ steps.meta.outputs.mod_version }}
+          version-type: release
+          game-versions: ${{ steps.meta.outputs.mc_version }}
+          loaders: ${{ steps.meta.outputs.loader }}
+          name: "SCGuardGolem v${{ steps.meta.outputs.mod_version }} [MC ${{ steps.meta.outputs.mc_version }}]"
+          changelog: "Initial release. Features: Security Guard Golem, patrol system, threat modes (WARN/FOLLOW/ATTACK), upgrades, player lists, in-game manual, /scgolem commands."
