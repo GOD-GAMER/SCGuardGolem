@@ -34,12 +34,16 @@ public class SCGManualItem extends Item {
         Style body = Style.EMPTY.withColor(ChatFormatting.BLACK);
         Style cmd = Style.EMPTY.withColor(ChatFormatting.DARK_GREEN);
         Style dim = Style.EMPTY.withColor(ChatFormatting.GRAY);
+        Style accent = Style.EMPTY.withBold(true).withColor(ChatFormatting.GOLD);
 
         List<Filterable<Component>> pages = List.of(
                 page(Component.empty()
-                        .append(Component.literal("Security Golem\nManual\n\n").withStyle(header))
-                        .append(Component.literal("This book covers all\ncommands for the\nSecurity Guard Golem.\n\n").withStyle(body))
-                        .append(Component.literal("Use /scgolem help\nfor a quick list.").withStyle(dim))),
+.append(Component.literal("\n\n").withStyle(body))
+.append(Component.literal("Security Guard\nGolem Manual").withStyle(header))
+.append(Component.literal("\n\nv1.2.0\n\n").withStyle(accent))
+.append(Component.literal("A complete guide\nto creating and\ncommanding your\nSecurity Golem.").withStyle(dim))
+.append(Component.literal("\n\n").withStyle(body))
+.append(Component.literal("by SCGuardGolem").withStyle(dim))),
                 page(Component.empty()
                         .append(Component.literal("Getting Started\n\n").withStyle(header))
                         .append(Component.literal("1. Place an Iron Golem\n").withStyle(body))
@@ -47,55 +51,81 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("3. Right-click the golem\n\n").withStyle(body))
                         .append(Component.literal("The golem converts into\na Security Guard Golem\nowned by you.").withStyle(dim))),
                 page(Component.empty()
-                        .append(Component.literal("Patrol Setup\n\n").withStyle(header))
-                        .append(Component.literal("/scgolem patrol start\n").withStyle(cmd))
-                        .append(Component.literal("Begin patrol route\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem patrol stop\n").withStyle(cmd))
-                        .append(Component.literal("Stop patrolling\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem patrol speed\n  <0.1-3.0>\n").withStyle(cmd))
-                        .append(Component.literal("Set patrol speed").withStyle(dim))),
+.append(Component.literal("Opening the GUI\n\n").withStyle(header))
+.append(Component.literal("Hold SC ").withStyle(body))
+.append(Component.literal("Wire Cutters").withStyle(accent))
+.append(Component.literal("\nand right-click\nyour golem to open\nthe config GUI.\n\n").withStyle(body))
+.append(Component.literal("The GUI has 3 tabs:\n").withStyle(body))
+.append(Component.literal("- Modules\n").withStyle(cmd))
+.append(Component.literal("- Patrol\n").withStyle(cmd))
+.append(Component.literal("- Settings").withStyle(cmd))),
                 page(Component.empty()
-                        .append(Component.literal("Waypoints\n\n").withStyle(header))
-                        .append(Component.literal("/scgolem patrol\n  waypoint addhere\n").withStyle(cmd))
-                        .append(Component.literal("Add at your pos\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem patrol\n  waypoint add\n  <x> <y> <z>\n").withStyle(cmd))
-                        .append(Component.literal("Add at coords\n\n").withStyle(dim))
-                        .append(Component.literal("  waypoint list\n").withStyle(cmd))
-                        .append(Component.literal("  waypoint remove <#>\n").withStyle(cmd))
-                        .append(Component.literal("  waypoint clear").withStyle(cmd))),
+                        .append(Component.literal("Module Upgrades\n\n").withStyle(header))
+                        .append(Component.literal("Place SC modules in\nthe 6 upgrade slots.\n").withStyle(body))
+                        .append(Component.literal("Stack count = level\n(1-5 per slot).\n\n").withStyle(dim))
+                        .append(Component.literal("Harming Module\n").withStyle(accent))
+                        .append(Component.literal("+3 attack damage\nper level\n\n").withStyle(dim))
+                        .append(Component.literal("Speed Module\n").withStyle(accent))
+                        .append(Component.literal("+0.03 move speed\nper level").withStyle(dim))),
                 page(Component.empty()
-                        .append(Component.literal("Threat Modes\n\n").withStyle(header))
-                        .append(Component.literal("/scgolem threat\n  warn\n").withStyle(cmd))
-                        .append(Component.literal("Warn in chat\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem threat\n  follow\n").withStyle(cmd))
-                        .append(Component.literal("Follow untrusted\nplayers\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem threat\n  attack\n").withStyle(cmd))
-                        .append(Component.literal("Attack untrusted\nplayers").withStyle(dim))),
-                page(Component.empty()
-                        .append(Component.literal("Upgrades (0-5)\n\n").withStyle(header))
-                        .append(Component.literal("/scgolem upgrade\n  damage <lvl>\n").withStyle(cmd))
-                        .append(Component.literal("+3 damage/level\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem upgrade\n  speed <lvl>\n").withStyle(cmd))
-                        .append(Component.literal("+0.03 speed/level\n\n").withStyle(dim))
-                        .append(Component.literal("/scgolem upgrade\n  detection <lvl>\n").withStyle(cmd))
-                        .append(Component.literal("+4 block radius\nper level").withStyle(dim))),
+                        .append(Component.literal("More Modules\n\n").withStyle(header))
+                        .append(Component.literal("Smart Module\n").withStyle(accent))
+                        .append(Component.literal("+4 block detection\nradius per level\n\n").withStyle(dim))
+                        .append(Component.literal("Storage Module\n").withStyle(accent))
+                        .append(Component.literal("+9 loot slots per\nlevel (max 27)\n\n").withStyle(dim))
+                        .append(Component.literal("Golem auto-collects\nnearby dropped items\ninto its chest when\nstorage is unlocked.").withStyle(dim))),
                 page(Component.empty()
                         .append(Component.literal("Player Lists\n\n").withStyle(header))
-                        .append(Component.literal("/scgolem list\n  ignore add <name>\n").withStyle(cmd))
-                        .append(Component.literal("Never attack\n\n").withStyle(dim))
-                        .append(Component.literal("  ignore remove\n   <name>\n\n").withStyle(cmd))
-                        .append(Component.literal("  attack add\n   <name>\n").withStyle(cmd))
-                        .append(Component.literal("Always attack\n\n").withStyle(dim))
-                        .append(Component.literal("  attack remove\n   <name>\n\n").withStyle(cmd))
-                        .append(Component.literal("/scgolem list show").withStyle(cmd))),
+                        .append(Component.literal("Allowlist Module\n").withStyle(accent))
+                        .append(Component.literal("= Don't Harm list\nPlayers on this list\nare never attacked.\n\n").withStyle(dim))
+                        .append(Component.literal("Denylist Module\n").withStyle(accent))
+                        .append(Component.literal("= Always Harm list\nPlayers on this list\nare always attacked.\n\n").withStyle(dim))
+                        .append(Component.literal("Edit the SC module\nbefore placing it!").withStyle(body))),
                 page(Component.empty()
-                        .append(Component.literal("Other Commands\n\n").withStyle(header))
+                        .append(Component.literal("Loot Storage\n\n").withStyle(header))
+                        .append(Component.literal("The Modules tab\nshows loot slots\nunlocked by the\nStorage Module.\n\n").withStyle(body))
+                        .append(Component.literal("Password protect\nyour golem's chest\nfrom Settings tab.\n\n").withStyle(body))
+                        .append(Component.literal("On death, all loot\nand modules drop.").withStyle(dim))),
+                page(Component.empty()
+                        .append(Component.literal("Camera System\n\n").withStyle(header))
+                        .append(Component.literal("Enable camera from\nthe Settings tab.\n\n").withStyle(body))
+                        .append(Component.literal("When enabled, a\ncamera entity rides\nthe golem at eye\nheight.\n\n").withStyle(body))
+                        .append(Component.literal("Use the SC ").withStyle(body))
+                        .append(Component.literal("Camera\nMonitor").withStyle(accent))
+                        .append(Component.literal(" to view the\ngolem's perspective.").withStyle(body))),
+                page(Component.empty()
+                        .append(Component.literal("Patrol System\n\n").withStyle(header))
+                        .append(Component.literal("Use the Patrol tab\nto add waypoints\nand toggle patrol.\n\n").withStyle(body))
+                        .append(Component.literal("\"+ Add Here\" adds\nyour current pos.\n\n").withStyle(dim))
+                        .append(Component.literal("Patrol speed and\non/off toggle are\nin the Settings tab.").withStyle(dim))),
+                page(Component.empty()
+                        .append(Component.literal("Threat Modes\n\n").withStyle(header))
+                        .append(Component.literal("Set from Settings:\n\n").withStyle(body))
+                        .append(Component.literal("WARN\n").withStyle(accent))
+                        .append(Component.literal("Warn in chat\n\n").withStyle(dim))
+                        .append(Component.literal("FOLLOW\n").withStyle(accent))
+                        .append(Component.literal("Follow untrusted\nplayers\n\n").withStyle(dim))
+                        .append(Component.literal("ATTACK\n").withStyle(accent))
+                        .append(Component.literal("Attack untrusted\nplayers").withStyle(dim))),
+                page(Component.empty()
+                        .append(Component.literal("Commands\n\n").withStyle(header))
+                        .append(Component.literal("Commands still work\nas an alternative\nto the GUI:\n\n").withStyle(dim))
                         .append(Component.literal("/scgolem status\n").withStyle(cmd))
-                        .append(Component.literal("Full status report\n\n").withStyle(dim))
                         .append(Component.literal("/scgolem setowner\n").withStyle(cmd))
-                        .append(Component.literal("Claim nearest golem\n\n").withStyle(dim))
-                        .append(Component.literal("Trust Priority\n").withStyle(header))
-                        .append(Component.literal("1. Attack list\n2. Ignore list\n3. Owner\n4. SC owner\n5. Threat mode").withStyle(body)))
+                        .append(Component.literal("/scgolem patrol ...\n").withStyle(cmd))
+                        .append(Component.literal("/scgolem threat ...\n").withStyle(cmd))
+                        .append(Component.literal("/scgolem upgrade ...\n").withStyle(cmd))
+                        .append(Component.literal("/scgolem list ...").withStyle(cmd))),
+                page(Component.empty()
+                        .append(Component.literal("Quick Reference\n\n").withStyle(header))
+                        .append(Component.literal("Keycard").withStyle(accent))
+                        .append(Component.literal(" = Convert\n").withStyle(body))
+                        .append(Component.literal("Wire Cutters").withStyle(accent))
+                        .append(Component.literal(" = GUI\n").withStyle(body))
+                        .append(Component.literal("Shift+Empty").withStyle(accent))
+                        .append(Component.literal(" = Status\n\n").withStyle(body))
+                        .append(Component.literal("Trust Priority:\n").withStyle(header))
+                        .append(Component.literal("1. Denylist (attack)\n2. Allowlist (ignore)\n3. Owner (safe)\n4. Threat mode").withStyle(body)))
         );
 
         return new WrittenBookContent(

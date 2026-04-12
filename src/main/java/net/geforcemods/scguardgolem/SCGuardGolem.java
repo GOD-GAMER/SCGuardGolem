@@ -2,6 +2,9 @@ package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.geforcemods.scguardgolem.network.CheckChestPassword;
+import net.geforcemods.scguardgolem.network.ModifyWaypoint;
+import net.geforcemods.scguardgolem.network.SyncGolemSettings;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +19,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -23,7 +28,7 @@ import com.mojang.logging.LogUtils;
 @EventBusSubscriber(modid = SCGuardGolem.MODID)
 public class SCGuardGolem {
     public static final String MODID = "scguardgolem";
-    public static final String VERSION = "1.1.0";
+    public static final String VERSION = "1.2.0";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     /** Cached flag — true when SecurityCraft is loaded at runtime. */
@@ -38,6 +43,14 @@ public class SCGuardGolem {
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         SCGCommands.register(event.getDispatcher());
+    }
+
+    @SubscribeEvent
+    public static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar(MODID).versioned("1.2.0");
+        registrar.playToServer(SyncGolemSettings.TYPE, SyncGolemSettings.STREAM_CODEC, SyncGolemSettings::handle);
+        registrar.playToServer(ModifyWaypoint.TYPE, ModifyWaypoint.STREAM_CODEC, ModifyWaypoint::handle);
+        registrar.playToServer(CheckChestPassword.TYPE, CheckChestPassword.STREAM_CODEC, CheckChestPassword::handle);
     }
 
     /**

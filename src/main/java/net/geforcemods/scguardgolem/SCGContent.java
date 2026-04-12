@@ -1,6 +1,8 @@
 package net.geforcemods.scguardgolem;
 
+import net.geforcemods.scguardgolem.entity.GolemCameraEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.geforcemods.scguardgolem.item.SCGManualItem;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
@@ -9,6 +11,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
@@ -16,6 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -30,6 +35,8 @@ public class SCGContent {
             DeferredRegister.createItems(SCGuardGolem.MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, SCGuardGolem.MODID);
+    public static final DeferredRegister<MenuType<?>> MENU_TYPES =
+            DeferredRegister.create(Registries.MENU, SCGuardGolem.MODID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<SecurityGolemEntity>> SECURITY_GOLEM =
             ENTITY_TYPES.register("security_golem", () ->
@@ -38,13 +45,27 @@ public class SCGContent {
                             .setTrackingRange(128)
                             .setUpdateInterval(3)
                             .setShouldReceiveVelocityUpdates(true)
-                            .build(SCGuardGolem.MODID + ":security_golem"));
+                        .build(SCGuardGolem.MODID + ":security_golem"));
 
-    public static final DeferredItem<SCGManualItem> SCG_MANUAL =
-            ITEMS.register("scg_manual", () -> new SCGManualItem(
-                    new Item.Properties().stacksTo(1)
-                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
-                                    SCGManualItem.buildManualContent())));
+public static final DeferredHolder<EntityType<?>, EntityType<GolemCameraEntity>> GOLEM_CAMERA =
+        ENTITY_TYPES.register("golem_camera", () ->
+                EntityType.Builder.<GolemCameraEntity>of(GolemCameraEntity::new, MobCategory.MISC)
+                        .sized(0.0F, 0.0F)
+                        .setTrackingRange(64)
+                        .setUpdateInterval(1)
+                        .setShouldReceiveVelocityUpdates(false)
+                        .noSummon()
+                        .build(SCGuardGolem.MODID + ":golem_camera"));
+
+public static final DeferredItem<SCGManualItem> SCG_MANUAL =
+        ITEMS.register("scg_manual", () -> new SCGManualItem(
+                new Item.Properties().stacksTo(1)
+                        .component(DataComponents.WRITTEN_BOOK_CONTENT,
+                                SCGManualItem.buildManualContent())));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<GolemMenu>> GOLEM_MENU =
+            MENU_TYPES.register("golem_menu", () ->
+                    IMenuTypeExtension.create(GolemMenu::new));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SCG_TAB =
             CREATIVE_MODE_TABS.register("scguardgolem", () -> CreativeModeTab.builder()
@@ -58,6 +79,7 @@ public class SCGContent {
         ENTITY_TYPES.register(modBus);
         ITEMS.register(modBus);
         CREATIVE_MODE_TABS.register(modBus);
+        MENU_TYPES.register(modBus);
     }
 
     @SubscribeEvent
