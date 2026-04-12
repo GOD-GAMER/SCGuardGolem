@@ -10,6 +10,13 @@ on:
         required: true
         type: choice
         options:
+          - mc26.1-v1.1.2
+          - mc1.21.11-v1.1.2
+          - mc1.21.10-v1.1.2
+          - mc1.21.8-v1.1.2
+          - mc1.21.1-v1.1.2
+          - mc1.20.4-v1.1.2
+          - mc1.20.1-v1.1.2
           - mc26.1-v1.1.1
           - mc1.21.11-v1.1.1
           - mc1.21.10-v1.1.1
@@ -90,4 +97,4 @@ jobs:
           game-versions: ${{ steps.meta.outputs.mc_version }}
           loaders: ${{ steps.meta.outputs.loader }}
           name: "SCGuardGolem v${{ steps.meta.outputs.mod_version }} [MC ${{ steps.meta.outputs.mc_version }}]"
-          changelog: "Optimization pass: TreeSet player lists for O(log n) case-insensitive lookups, cached unmodifiable views, direct UUID comparison, fixed case-sensitivity bug."
+          changelog: "v1.1.2: Fix missing item texture for scg_manual. v1.1.1: Optimization pass — TreeSet player lists, cached views, direct UUID comparison, case-sensitivity fix."
