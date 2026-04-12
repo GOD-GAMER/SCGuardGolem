@@ -14,7 +14,6 @@ public class SCGClientEvents {
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(SCGContent.SECURITY_GOLEM.get(), SecurityGolemRenderer::new);
-        event.registerEntityRenderer(SCGContent.GOLEM_CAMERA.get(), GolemCameraRenderer::new);
     }
 
     @SubscribeEvent
