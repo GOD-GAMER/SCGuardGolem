@@ -1,14 +1,18 @@
 # Changelog
 
-## [1.0.0] - 2025-01-01
+## 1.2.0
+- Wire Cutters GUI: right-click your golem with SC Wire Cutters to open configuration screen
+- Module-based upgrades: Harming, Speed, Smart modules (stack count = level)
+- Allowlist/Denylist modules for player targeting lists
+- Loot collection system with Storage Module (auto-pickup, upgradeable chest rows)
+- Camera toggle for golem perspective viewing
+- Patrol and threat mode toggleable from GUI buttons
+- Modules and loot drop on golem death
+- Updated in-game manual with full v1.2 documentation
+- Removed old command-based upgrade/list system (use GUI modules instead)
 
-### Added
-- Security Guard Golem entity (converts from Iron Golem with SecurityCraft keycard)
-- Patrol system with waypoints and adjustable speed
-- Three threat modes: WARN, FOLLOW, ATTACK
-- Upgrade system for damage, speed, and detection range
-- Player ignore and always-attack lists
-- In-game manual book item (NBT-based)
-- Full command system (/scgolem)
-- SecurityCraft Owner-based trust detection
-- Creative mode tab
+## 1.1.0
+- Initial release for MC 26.1
+- Security Guard Golem with patrol, badge, threat, and upgrade systems
+- Player ignore/attack lists
+- In-game manual book

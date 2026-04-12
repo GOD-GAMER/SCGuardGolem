@@ -3,13 +3,13 @@ package net.geforcemods.scguardgolem.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity.ThreatMode;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -17,13 +17,14 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
+import java.util.Set;
 
 public class SCGCommands {
 
     private static final double SEARCH_RANGE = 32.0;
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("scgolem").requires(src -> src.hasPermission(2))
+        dispatcher.register(Commands.literal("scgolem").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
                 .then(Commands.literal("patrol")
                         .then(Commands.literal("start").executes(SCGCommands::patrolStart))
                         .then(Commands.literal("stop").executes(SCGCommands::patrolStop))
@@ -46,32 +47,6 @@ public class SCGCommands {
                         .then(Commands.literal("warn").executes(ctx -> setThreatMode(ctx, ThreatMode.WARN)))
                         .then(Commands.literal("follow").executes(ctx -> setThreatMode(ctx, ThreatMode.FOLLOW)))
                         .then(Commands.literal("attack").executes(ctx -> setThreatMode(ctx, ThreatMode.ATTACK))))
-                .then(Commands.literal("upgrade")
-                        .then(Commands.literal("damage")
-                                .then(Commands.argument("level", IntegerArgumentType.integer(0, SecurityGolemEntity.MAX_UPGRADE_LEVEL))
-                                        .executes(ctx -> setUpgrade(ctx, "damage"))))
-                        .then(Commands.literal("speed")
-                                .then(Commands.argument("level", IntegerArgumentType.integer(0, SecurityGolemEntity.MAX_UPGRADE_LEVEL))
-                                        .executes(ctx -> setUpgrade(ctx, "speed"))))
-                        .then(Commands.literal("detection")
-                                .then(Commands.argument("level", IntegerArgumentType.integer(0, SecurityGolemEntity.MAX_UPGRADE_LEVEL))
-                                        .executes(ctx -> setUpgrade(ctx, "detection")))))
-                .then(Commands.literal("list")
-                        .then(Commands.literal("ignore")
-                                .then(Commands.literal("add")
-                                        .then(Commands.argument("name", StringArgumentType.word())
-                                                .executes(ctx -> listModify(ctx, "ignore", true))))
-                                .then(Commands.literal("remove")
-                                        .then(Commands.argument("name", StringArgumentType.word())
-                                                .executes(ctx -> listModify(ctx, "ignore", false)))))
-                        .then(Commands.literal("attack")
-                                .then(Commands.literal("add")
-                                        .then(Commands.argument("name", StringArgumentType.word())
-                                                .executes(ctx -> listModify(ctx, "attack", true))))
-                                .then(Commands.literal("remove")
-                                        .then(Commands.argument("name", StringArgumentType.word())
-                                                .executes(ctx -> listModify(ctx, "attack", false)))))
-                        .then(Commands.literal("show").executes(SCGCommands::listShow)))
                 .then(Commands.literal("status").executes(SCGCommands::showStatus))
                 .then(Commands.literal("setowner").executes(SCGCommands::setOwner)));
     }
@@ -193,39 +168,6 @@ public class SCGCommands {
         return 1;
     }
 
-    private static int setUpgrade(CommandContext<CommandSourceStack> ctx, String type) {
-        SecurityGolemEntity g = requireGolem(ctx);
-        if (g == null) return 0;
-        int level = IntegerArgumentType.getInteger(ctx, "level");
-        switch (type) {
-            case "damage" -> g.setDamageUpgrade(level);
-            case "speed" -> g.setSpeedUpgrade(level);
-            case "detection" -> g.setDetectionUpgrade(level);
-        }
-        msg(ctx, "Upgrade \u00a7e" + type + "\u00a7f set to level \u00a7e" + level + "\u00a7f.");
-        return 1;
-    }
-
-    private static int listModify(CommandContext<CommandSourceStack> ctx, String listType, boolean add) {
-        SecurityGolemEntity g = requireGolem(ctx);
-        if (g == null) return 0;
-        String name = StringArgumentType.getString(ctx, "name");
-        boolean success = "ignore".equals(listType)
-                ? (add ? g.addToIgnoreList(name) : g.removeFromIgnoreList(name))
-                : (add ? g.addToAlwaysAttackList(name) : g.removeFromAlwaysAttackList(name));
-        if (success) msg(ctx, (add ? "Added" : "Removed") + " \u00a7e" + name + "\u00a7f " + (add ? "to" : "from") + " " + listType + " list.");
-        else ctx.getSource().sendFailure(Component.literal("\u00a7cPlayer " + name + " " + (add ? "already on" : "not on") + " " + listType + " list."));
-        return 1;
-    }
-
-    private static int listShow(CommandContext<CommandSourceStack> ctx) {
-        SecurityGolemEntity g = requireGolem(ctx);
-        if (g == null) return 0;
-        msg(ctx, "\u00a7eIgnore list:\u00a7f " + (g.getIgnoreList().isEmpty() ? "(empty)" : String.join(", ", g.getIgnoreList())));
-        msg(ctx, "\u00a7eAttack list:\u00a7f " + (g.getAlwaysAttackList().isEmpty() ? "(empty)" : String.join(", ", g.getAlwaysAttackList())));
-        return 1;
-    }
-
     private static int showStatus(CommandContext<CommandSourceStack> ctx) {
         SecurityGolemEntity g = requireGolem(ctx);
         if (g == null) return 0;
@@ -236,9 +178,12 @@ public class SCGCommands {
                 + " \u00a7f| Speed: \u00a7e" + String.format("%.2f", g.getPatrolSpeed()));
         msg(ctx, "Threat Mode: \u00a7e" + g.getThreatMode().name());
         msg(ctx, "Detection Radius: \u00a7e" + String.format("%.1f", g.getEffectiveDetectionRadius()) + " blocks");
-        msg(ctx, "Upgrades \u2014 DMG:\u00a7e" + g.getDamageUpgrade() + "\u00a7f SPD:\u00a7e" + g.getSpeedUpgrade() + "\u00a7f DET:\u00a7e" + g.getDetectionUpgrade());
-        msg(ctx, "Ignore: \u00a77" + (g.getIgnoreList().isEmpty() ? "(empty)" : String.join(", ", g.getIgnoreList())));
-        msg(ctx, "Attack: \u00a77" + (g.getAlwaysAttackList().isEmpty() ? "(empty)" : String.join(", ", g.getAlwaysAttackList())));
+        msg(ctx, "Modules \u2014 DMG:\u00a7e" + g.getDamageUpgrade() + "\u00a7f SPD:\u00a7e" + g.getSpeedUpgrade() + "\u00a7f DET:\u00a7e" + g.getDetectionUpgrade());
+        msg(ctx, "Camera: " + (g.hasCamera() ? "\u00a7aInstalled" : "\u00a77None"));
+        Set<String> ignore = g.getIgnoreListNames();
+        Set<String> attack = g.getAlwaysAttackListNames();
+        msg(ctx, "Ignore: \u00a77" + (ignore.isEmpty() ? "(empty)" : String.join(", ", ignore)));
+        msg(ctx, "Attack: \u00a77" + (attack.isEmpty() ? "(empty)" : String.join(", ", attack)));
         return 1;
     }
 
