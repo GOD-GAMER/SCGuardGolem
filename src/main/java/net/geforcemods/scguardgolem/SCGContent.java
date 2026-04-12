@@ -1,70 +1,63 @@
 package net.geforcemods.scguardgolem;
 
-import net.geforcemods.scguardgolem.entity.GolemCameraEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.geforcemods.scguardgolem.item.SCGManualItem;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.animal.IronGolem;
-import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.common.extensions.IForgeMenuType;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
-import net.minecraftforge.registries.DeferredRegister;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.RegistryObject;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
+import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
 
-@Mod.EventBusSubscriber(modid = SCGuardGolem.MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = SCGuardGolem.MODID)
 public class SCGContent {
 
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
-            DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, SCGuardGolem.MODID);
-    public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(ForgeRegistries.ITEMS, SCGuardGolem.MODID);
+            DeferredRegister.create(Registries.ENTITY_TYPE, SCGuardGolem.MODID);
+    public static final DeferredRegister.Items ITEMS =
+            DeferredRegister.createItems(SCGuardGolem.MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, SCGuardGolem.MODID);
     public static final DeferredRegister<MenuType<?>> MENU_TYPES =
-            DeferredRegister.create(ForgeRegistries.MENU_TYPES, SCGuardGolem.MODID);
+            DeferredRegister.create(Registries.MENU, SCGuardGolem.MODID);
 
-    public static final RegistryObject<EntityType<SecurityGolemEntity>> SECURITY_GOLEM =
+    public static final DeferredHolder<EntityType<?>, EntityType<SecurityGolemEntity>> SECURITY_GOLEM =
             ENTITY_TYPES.register("security_golem", () ->
                     EntityType.Builder.<SecurityGolemEntity>of(SecurityGolemEntity::new, MobCategory.MISC)
                             .sized(1.4F, 2.7F)
-                            .clientTrackingRange(128)
-                            .updateInterval(3)
+                            .setTrackingRange(128)
+                            .setUpdateInterval(3)
                             .setShouldReceiveVelocityUpdates(true)
-                            .build(new ResourceLocation(SCGuardGolem.MODID, "security_golem").toString()));
+                            .build(ResourceKey.create(Registries.ENTITY_TYPE,
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
 
-    public static final RegistryObject<EntityType<GolemCameraEntity>> GOLEM_CAMERA =
-            ENTITY_TYPES.register("golem_camera", () ->
-                    EntityType.Builder.<GolemCameraEntity>of(GolemCameraEntity::new, MobCategory.MISC)
-                            .sized(0.0F, 0.0F)
-                            .clientTrackingRange(64)
-                            .updateInterval(1)
-                            .setShouldReceiveVelocityUpdates(false)
-                            .noSummon()
-                            .build(new ResourceLocation(SCGuardGolem.MODID, "golem_camera").toString()));
-
-    public static final RegistryObject<SCGManualItem> SCG_MANUAL =
-            ITEMS.register("scg_manual", () -> new SCGManualItem(new Item.Properties().stacksTo(1)));
-
-    public static final RegistryObject<MenuType<GolemMenu>> GOLEM_MENU =
+    public static final DeferredHolder<MenuType<?>, MenuType<GolemMenu>> GOLEM_MENU =
             MENU_TYPES.register("golem_menu", () ->
-                    IForgeMenuType.create(GolemMenu::new));
+                    IMenuTypeExtension.create(GolemMenu::new));
 
-    public static final RegistryObject<CreativeModeTab> SCG_TAB =
+    public static final DeferredItem<SCGManualItem> SCG_MANUAL =
+            ITEMS.registerItem("scg_manual", SCGManualItem::new,
+                    p -> p.stacksTo(1)
+                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
+                                    SCGManualItem.buildManualContent()));
+
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SCG_TAB =
             CREATIVE_MODE_TABS.register("scguardgolem", () -> CreativeModeTab.builder()
                     .withTabsBefore(CreativeModeTabs.SPAWN_EGGS)
                     .icon(() -> new ItemStack(SCG_MANUAL.get()))
@@ -87,6 +80,7 @@ public class SCGContent {
                         .add(Attributes.MOVEMENT_SPEED, 0.25D)
                         .add(Attributes.KNOCKBACK_RESISTANCE, 1.0D)
                         .add(Attributes.ATTACK_DAMAGE, 15.0D)
+                        .add(Attributes.STEP_HEIGHT, 1.0D)
                         .build());
     }
 }

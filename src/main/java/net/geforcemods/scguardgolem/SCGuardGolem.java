@@ -2,71 +2,84 @@ package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
-import net.geforcemods.scguardgolem.network.SCGNetwork;
 import net.geforcemods.securitycraft.items.KeycardItem;
+import net.geforcemods.securitycraft.items.WireCuttersItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.MobSpawnType;
-import net.minecraft.world.entity.animal.IronGolem;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.animal.golem.IronGolem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 @Mod(SCGuardGolem.MODID)
+@EventBusSubscriber(modid = SCGuardGolem.MODID)
 public class SCGuardGolem {
     public static final String MODID = "scguardgolem";
     public static final String VERSION = "1.2.0";
     public static final Logger LOGGER = LogUtils.getLogger();
+
     public static boolean scLoaded;
 
-    public SCGuardGolem() {
+    public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
-        SCGContent.register(FMLJavaModLoadingContext.get().getModEventBus());
-        FMLJavaModLoadingContext.get().getModEventBus().addListener(this::commonSetup);
-        MinecraftForge.EVENT_BUS.register(this);
-        LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.20.1)");
-    }
-
-    private void commonSetup(final FMLCommonSetupEvent event) {
-        SCGNetwork.register();
+        SCGContent.register(modBus);
+        LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 26.1)");
     }
 
     @SubscribeEvent
-    public void onRegisterCommands(RegisterCommandsEvent event) {
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
         SCGCommands.register(event.getDispatcher());
     }
 
     /**
      * Right-click a vanilla Iron Golem with any SecurityCraft keycard to
      * convert it into a Security Guard Golem.
+     * Right-click a Security Guard Golem with Wire Cutters to open the GUI.
      */
     @SubscribeEvent
-    public void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getLevel().isClientSide()) return;
-        if (!(event.getTarget() instanceof IronGolem ironGolem)) return;
-        if (event.getTarget() instanceof SecurityGolemEntity) return;
 
         Player player = event.getEntity();
         ItemStack held = player.getItemInHand(event.getHand());
 
+        // Wire Cutters on a Security Golem → open configuration GUI
+        if (event.getTarget() instanceof SecurityGolemEntity golem && isWireCutters(held)) {
+            if (golem.isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+                if (player instanceof ServerPlayer serverPlayer) {
+                    serverPlayer.openMenu(golem);
+                }
+            } else {
+                player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
+            }
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
+            return;
+        }
+
+        // Keycard on a vanilla Iron Golem → convert to Security Golem
+        if (!(event.getTarget() instanceof IronGolem ironGolem)) return;
+        if (event.getTarget() instanceof SecurityGolemEntity) return;
         if (!isKeycardItem(held)) return;
 
         ServerLevel serverLevel = (ServerLevel) event.getLevel();
         SecurityGolemEntity golem = SCGContent.SECURITY_GOLEM.get()
-                .create(serverLevel, null, null, ironGolem.blockPosition(), MobSpawnType.CONVERSION, false, false);
+                .create(serverLevel, EntitySpawnReason.CONVERSION);
         if (golem == null) return;
 
-        golem.moveTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
+        golem.snapTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
                 ironGolem.getYRot(), ironGolem.getXRot());
         golem.setHealth(ironGolem.getHealth());
         golem.setPlayerCreated(ironGolem.isPlayerCreated());
@@ -76,8 +89,8 @@ public class SCGuardGolem {
         serverLevel.addFreshEntity(golem);
 
         held.shrink(1);
-        player.displayClientMessage(
-                Component.translatable("scguardgolem.conversion.success"), false);
+        player.sendSystemMessage(
+                Component.translatable("scguardgolem.conversion.success"));
 
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
@@ -87,6 +100,15 @@ public class SCGuardGolem {
         if (!scLoaded || stack.isEmpty()) return false;
         try {
             return stack.getItem() instanceof KeycardItem;
+        } catch (NoClassDefFoundError e) {
+            return false;
+        }
+    }
+
+    public static boolean isWireCutters(ItemStack stack) {
+        if (!scLoaded || stack.isEmpty()) return false;
+        try {
+            return stack.getItem() instanceof WireCuttersItem;
         } catch (NoClassDefFoundError e) {
             return false;
         }
