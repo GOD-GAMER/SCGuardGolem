@@ -1,5 +1,5 @@
 plugins {
-    id("net.neoforged.moddev") version "2.0.99"
+    id("net.neoforged.moddev") version "2.0.134"
     id("net.darkhax.curseforgegradle") version "1.1.25"
 }
 
@@ -14,7 +14,7 @@ base {
     version = modVersion
 }
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))
 
 tasks.processResources {
     exclude(".cache")
