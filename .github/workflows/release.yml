@@ -10,6 +10,9 @@ on:
         required: true
         type: choice
         options:
+          - mc1.21.10-v1.0.1
+          - mc1.20.4-v1.0.1
+          - mc1.20.1-v1.0.1
           - mc1.21.10-v1.0.0
           - mc1.20.4-v1.0.0
           - mc1.20.1-v1.0.0
