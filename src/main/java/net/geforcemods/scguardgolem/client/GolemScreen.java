@@ -10,38 +10,34 @@ import net.minecraft.world.entity.player.Inventory;
 
 public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
-    // ?? Palette ??
-    private static final int BG = 0xFF0F0F1E;
-    private static final int PANEL = 0xFF1A1A30;
-    private static final int PANEL_LIGHT = 0xFF222240;
-    private static final int BORDER = 0xFF3A3A5E;
-    private static final int BORDER_DARK = 0xFF0A0A18;
-    private static final int TAB_ACTIVE = 0xFF2A2A4A;
-    private static final int TAB_INACTIVE = 0xFF14142A;
-    private static final int ACCENT = 0xFF4488FF;
-    private static final int SLOT_BG = 0xFF111125;
-    private static final int SLOT_LIGHT = 0xFF2A2A48;
-    private static final int SLOT_DARK = 0xFF060612;
-    private static final int TEXT_HEADING = 0xFF55FFFF;
-    private static final int TEXT_BODY = 0xFFCCCCCC;
-    private static final int TEXT_DIM = 0xFF888899;
-    private static final int SEPARATOR = 0xFF2A2A48;
+    // ?? Colors ??
+    private static final int C_BG        = 0xFFC6C6C6; // vanilla gray background
+    private static final int C_BORDER_LT = 0xFFFFFFFF; // white highlight
+    private static final int C_BORDER_DK = 0xFF555555; // dark shadow
+    private static final int C_SLOT_BG   = 0xFF8B8B8B; // slot interior
+    private static final int C_SLOT_LT   = 0xFFFFFFFF; // slot bottom/right
+    private static final int C_SLOT_DK   = 0xFF373737; // slot top/left
+    private static final int C_TAB_ON    = 0xFFC6C6C6; // active tab = same as bg
+    private static final int C_TAB_OFF   = 0xFF8B8B8B; // inactive tab = darker
+    private static final int C_TITLE     = 0xFF404040; // dark text
+    private static final int C_LABEL     = 0xFF404040; // label text
+    private static final int C_DIM       = 0xFF666666; // dim text
+    private static final int C_ACCENT    = 0xFF3366CC; // blue accent
+    private static final int C_SEP       = 0xFFAAAAAA; // separator
 
-    // ?? Layout ??
-    private static final int GUI_W = 220;
-    private static final int GUI_H = 200;
-    private static final int TAB_H = 22;
-    private static final int CONTENT_TOP = TAB_H + 2;
+    // ?? Dimensions ??
+    private static final int W = 176;
+    private static final int H = 166;
+    private static final int TAB_BAR_H = 14;
 
-    private static final String[] TAB_LABELS = {"\u2699 Settings", "\u25A0 Modules", "\u25B6 Loot"};
+    // Toggle buttons for config tab
+    private Button patrolBtn, threatBtn, cameraBtn;
 
-    private Button patrolButton;
-    private Button threatButton;
-    private Button cameraButton;
-    private Button[] tabButtons = new Button[3];
+    // Tab buttons
+    private Button configTabBtn, lootTabBtn;
 
     public GolemScreen(GolemMenu menu, Inventory playerInv, Component title) {
-        super(menu, playerInv, title, GUI_W, GUI_H);
+        super(menu, playerInv, title, W, H);
         this.inventoryLabelY = 999;
         this.titleLabelY = 999;
     }
@@ -49,55 +45,44 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     @Override
     protected void init() {
         super.init();
+        int x = leftPos;
+        int y = topPos;
 
-        // ?? Tab buttons ??
-        int tabW = 68;
-        int tabGap = 2;
-        int totalTabW = tabW * 3 + tabGap * 2;
-        int tabStartX = leftPos + (GUI_W - totalTabW) / 2;
+        // ?? Tab bar (above main panel) ??
+        int tabW = W / 2;
+        configTabBtn = addRenderableWidget(
+            Button.builder(Component.literal("Configure"), b -> switchTab(GolemMenu.TAB_CONFIG))
+                .bounds(x, y - TAB_BAR_H, tabW, TAB_BAR_H).build());
+        lootTabBtn = addRenderableWidget(
+            Button.builder(Component.literal("Loot Chest"), b -> switchTab(GolemMenu.TAB_LOOT))
+                .bounds(x + tabW, y - TAB_BAR_H, tabW, TAB_BAR_H).build());
 
-        for (int i = 0; i < 3; i++) {
-            final int idx = i;
-            tabButtons[i] = addRenderableWidget(
-                Button.builder(Component.literal(TAB_LABELS[i]), btn -> switchTab(idx))
-                    .bounds(tabStartX + i * (tabW + tabGap), topPos + 2, tabW, TAB_H - 4)
-                    .build());
-        }
-
-        // ?? Settings buttons (big, centered, spacious) ??
-        int cx = leftPos + GUI_W / 2;
-        int by = topPos + CONTENT_TOP + 38;
-        int btnW = 140;
+        // ?? Config tab: 3 toggle buttons on the RIGHT side ??
+        int btnX = x + 90;
+        int btnY = y + 28;
+        int btnW = 78;
         int btnH = 20;
-        int btnGap = 30;
+        int btnGap = 24;
 
-        patrolButton = addRenderableWidget(
-            Button.builder(getPatrolText(), btn -> {
-                clickButton(0);
-                btn.setMessage(getPatrolText());
-            }).bounds(cx - btnW / 2, by, btnW, btnH).build());
+        patrolBtn = addRenderableWidget(
+            Button.builder(getPatrolText(), b -> { clickButton(0); b.setMessage(getPatrolText()); })
+                .bounds(btnX, btnY, btnW, btnH).build());
+        threatBtn = addRenderableWidget(
+            Button.builder(getThreatText(), b -> { clickButton(1); b.setMessage(getThreatText()); })
+                .bounds(btnX, btnY + btnGap, btnW, btnH).build());
+        cameraBtn = addRenderableWidget(
+            Button.builder(getCameraText(), b -> { clickButton(2); b.setMessage(getCameraText()); })
+                .bounds(btnX, btnY + btnGap * 2, btnW, btnH).build());
 
-        threatButton = addRenderableWidget(
-            Button.builder(getThreatText(), btn -> {
-                clickButton(1);
-                btn.setMessage(getThreatText());
-            }).bounds(cx - btnW / 2, by + btnGap, btnW, btnH).build());
-
-        cameraButton = addRenderableWidget(
-            Button.builder(getCameraText(), btn -> {
-                clickButton(2);
-                btn.setMessage(getCameraText());
-            }).bounds(cx - btnW / 2, by + btnGap * 2, btnW, btnH).build());
-
-        switchTab(GolemMenu.TAB_SETTINGS);
+        switchTab(GolemMenu.TAB_CONFIG);
     }
 
     private void switchTab(int tab) {
         menu.setTab(tab);
-        boolean settings = (tab == GolemMenu.TAB_SETTINGS);
-        patrolButton.visible = settings;
-        threatButton.visible = settings;
-        cameraButton.visible = settings;
+        boolean config = (tab == GolemMenu.TAB_CONFIG);
+        patrolBtn.visible = config;
+        threatBtn.visible = config;
+        cameraBtn.visible = config;
     }
 
     private void clickButton(int id) {
@@ -106,181 +91,169 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor gfx, int mx, int my, float pt) {
-        super.extractRenderState(gfx, mx, my, pt);
-        extractTooltip(gfx, mx, my);
-        patrolButton.setMessage(getPatrolText());
-        threatButton.setMessage(getThreatText());
-        cameraButton.setMessage(getCameraText());
+    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
+        super.extractRenderState(g, mx, my, pt);
+        extractTooltip(g, mx, my);
+        patrolBtn.setMessage(getPatrolText());
+        threatBtn.setMessage(getThreatText());
+        cameraBtn.setMessage(getCameraText());
     }
 
     @Override
-    public void extractContents(GuiGraphicsExtractor gfx, int mx, int my, float pt) {
+    public void extractContents(GuiGraphicsExtractor g, int mx, int my, float pt) {
         int x = leftPos;
         int y = topPos;
+        boolean config = menu.getCurrentTab() == GolemMenu.TAB_CONFIG;
 
-        // ?? Background ??
-        gfx.fill(x, y, x + GUI_W, y + GUI_H, BG);
-        drawBorder(gfx, x, y, GUI_W, GUI_H, BORDER, BORDER_DARK);
+        // ?? Main panel (vanilla chest style) ??
+        drawPanel(g, x, y, W, H);
 
-        // ?? Tab bar ??
-        gfx.fill(x + 1, y + 1, x + GUI_W - 1, y + TAB_H, TAB_INACTIVE);
-        int tabW = 68;
-        int tabGap = 2;
-        int totalTabW = tabW * 3 + tabGap * 2;
-        int tabStartX = x + (GUI_W - totalTabW) / 2;
-        int active = menu.getCurrentTab();
-        int ax = tabStartX + active * (tabW + tabGap);
-        gfx.fill(ax - 1, y + 1, ax + tabW + 1, y + TAB_H, TAB_ACTIVE);
-        gfx.fill(ax, y + TAB_H - 1, ax + tabW, y + TAB_H, ACCENT);
+        // ?? Tab indicators above panel ??
+        // Active tab gets same color as panel, inactive gets darker
+        int tabW = W / 2;
+        g.fill(x, y - TAB_BAR_H, x + tabW, y, config ? C_TAB_ON : C_TAB_OFF);
+        g.fill(x + tabW, y - TAB_BAR_H, x + W, y, config ? C_TAB_OFF : C_TAB_ON);
+        // Bottom border of inactive tab
+        if (config) {
+            g.fill(x + tabW, y - 1, x + W, y, C_BORDER_DK);
+        } else {
+            g.fill(x, y - 1, x + tabW, y, C_BORDER_DK);
+        }
 
-        // ?? Separator below tabs ??
-        gfx.fill(x + 1, y + TAB_H, x + GUI_W - 1, y + TAB_H + 1, BORDER);
+        // ?? Title ??
+        String title = config ? "Security Golem" : "Collected Loot";
+        g.text(font, title, x + 8, y + 6, C_TITLE, false);
 
-        // ?? Content area ??
-        int cy = y + CONTENT_TOP;
-        gfx.fill(x + 1, cy, x + GUI_W - 1, y + GUI_H - 1, PANEL);
-
-        switch (active) {
-            case GolemMenu.TAB_SETTINGS -> drawSettings(gfx, x, cy);
-            case GolemMenu.TAB_MODULES -> drawModules(gfx, x, cy);
-            case GolemMenu.TAB_LOOT -> drawLoot(gfx, x, cy);
+        if (config) {
+            drawConfigTab(g, x, y);
+        } else {
+            drawLootTab(g, x, y);
         }
     }
 
-    // ??????????? SETTINGS ???????????
-    private void drawSettings(GuiGraphicsExtractor gfx, int x, int cy) {
-        centeredText(gfx, "Security Golem Configuration", x + GUI_W / 2, cy + 8, TEXT_HEADING);
-        gfx.fill(x + 20, cy + 20, x + GUI_W - 20, cy + 21, SEPARATOR);
+    // ?????????? CONFIG TAB ??????????
+    private void drawConfigTab(GuiGraphicsExtractor g, int x, int y) {
+        // ?? Left side: Module upgrade slots ??
+        g.text(font, "Modules", x + 8, y + 18, C_LABEL, false);
 
-        // Status panel at bottom
-        int px = x + 12;
-        int py = cy + 120;
-        int pw = GUI_W - 24;
-        int ph = 48;
-
-        gfx.fill(px, py, px + pw, py + ph, PANEL_LIGHT);
-        drawBorder(gfx, px, py, pw, ph, BORDER, BORDER_DARK);
-
-        gfx.text(font, "\u00a7bStatus", px + 6, py + 4, TEXT_HEADING, false);
-        gfx.fill(px + 2, py + 14, px + pw - 2, py + 15, SEPARATOR);
-
-        String owner = menu.getGolem().getOwnerName();
-        gfx.text(font, "Owner: \u00a7f" + (owner.isEmpty() ? "None" : owner), px + 6, py + 18, TEXT_DIM, false);
-
-        String hp = String.format("%.0f / %.0f", menu.getGolem().getHealth(), menu.getGolem().getMaxHealth());
-        gfx.text(font, "Health: \u00a7a" + hp, px + 6, py + 30, TEXT_DIM, false);
-
-        int lootCap = menu.getLootRows() * 9;
-        gfx.text(font, "Loot: \u00a7e" + lootCap + " slots", px + pw / 2, py + 30, TEXT_DIM, false);
-    }
-
-    // ??????????? MODULES ???????????
-    private void drawModules(GuiGraphicsExtractor gfx, int x, int cy) {
-        centeredText(gfx, "Module Upgrades", x + GUI_W / 2, cy + 6, TEXT_HEADING);
-        gfx.fill(x + 20, cy + 17, x + GUI_W - 20, cy + 18, SEPARATOR);
-
-        String[] names = {"Harming", "Speed", "Smart", "Allowlist", "Denylist", "Storage"};
-        String[] descs = {"+3 dmg/lvl", "+0.03 spd/lvl", "Better AI", "Friend list", "Enemy list", "+9 slots/lvl"};
-
-        int slotX0 = 35;
-        int slotY0 = 50;
-        int colSp = 50;
-        int rowSp = 36;
-
+        String[] labels = {"Harm", "Speed", "Smart", "Allow", "Deny", "Store"};
         for (int i = 0; i < 6; i++) {
             int col = i % 3;
             int row = i / 3;
-            int bgX = x + slotX0 - 1 + col * colSp;
-            int bgY = topPos + slotY0 - 1 + row * rowSp;
+            int sx = x + GolemMenu.MOD_X - 1 + col * GolemMenu.MOD_COL;
+            int sy = y + GolemMenu.MOD_Y - 1 + row * GolemMenu.MOD_ROW;
 
-            // Label above
-            gfx.text(font, names[i], bgX + 1, bgY - 10, TEXT_BODY, false);
-            // Slot visual
-            drawSlot(gfx, bgX, bgY);
-            // Description below
-            gfx.text(font, descs[i], bgX + 1, bgY + 20, TEXT_DIM, false);
+            drawSlot(g, sx, sy);
+            // Label below each slot
+            g.text(font, labels[i], sx + 1, sy + 19, C_DIM, false);
         }
 
-        centeredText(gfx, "Drop SC modules in to upgrade", x + GUI_W / 2, cy + GUI_H - CONTENT_TOP - 16, TEXT_DIM);
+        // ?? Right side heading ??
+        g.text(font, "Controls", x + 90, y + 18, C_LABEL, false);
+
+        // ?? Separator line between left and right ??
+        g.fill(x + 84, y + 18, x + 85, y + 100, C_SEP);
+
+        // ?? Bottom: Status info ??
+        g.fill(x + 4, y + 105, x + W - 4, y + 106, C_SEP);
+
+        String owner = menu.getGolem().getOwnerName();
+        g.text(font, "Owner: " + (owner.isEmpty() ? "None" : owner), x + 8, y + 110, C_DIM, false);
+
+        String hp = String.format("HP: %.0f/%.0f", menu.getGolem().getHealth(), menu.getGolem().getMaxHealth());
+        g.text(font, hp, x + 8, y + 122, C_DIM, false);
+
+        int lootCap = menu.getLootRows() * 9;
+        g.text(font, "Loot: " + lootCap + " slots", x + 90, y + 110, C_DIM, false);
+
+        String mode = SecurityGolemEntity.ThreatMode.fromOrdinal(menu.getData().get(1)).name();
+        g.text(font, "Mode: " + mode, x + 90, y + 122, C_DIM, false);
+
+        // ?? Hint ??
+        g.text(font, "Place SC modules to upgrade", x + 8, y + H - 12, C_DIM, false);
     }
 
-    // ??????????? LOOT ???????????
-    private void drawLoot(GuiGraphicsExtractor gfx, int x, int cy) {
+    // ?????????? LOOT TAB ??????????
+    private void drawLootTab(GuiGraphicsExtractor g, int x, int y) {
         int lootRows = menu.getLootRows();
 
-        gfx.text(font, "\u00a7bCollected Loot", x + 8, cy + 4, TEXT_HEADING, false);
-        String capText = lootRows * 9 + " slots";
-        gfx.text(font, capText, x + GUI_W - 8 - font.width(capText), cy + 4, TEXT_DIM, false);
-        gfx.fill(x + 4, cy + 14, x + GUI_W - 4, cy + 15, SEPARATOR);
-
-        // Loot slot visuals (background at slot.x-1, slot.y-1 relative to GUI origin)
-        int lootSlotX = 22;
-        int lootSlotY = 30;
+        // Loot slot backgrounds
         for (int row = 0; row < lootRows; row++) {
             for (int col = 0; col < 9; col++) {
-                drawSlot(gfx, x + lootSlotX - 1 + col * 18, topPos + lootSlotY - 1 + row * 18);
+                drawSlot(g, x + GolemMenu.LOOT_X - 1 + col * 18, y + GolemMenu.LOOT_Y - 1 + row * 18);
             }
         }
 
-        // Inventory separator
-        int invSepY = topPos + lootSlotY + lootRows * 18 + 4;
-        gfx.fill(x + 4, invSepY, x + GUI_W - 4, invSepY + 1, SEPARATOR);
-        gfx.text(font, "Inventory", x + 8, invSepY + 3, TEXT_DIM, false);
+        // Separator + label before player inventory
+        int sepY = y + GolemMenu.LOOT_Y + lootRows * 18 + 3;
+        g.fill(x + 4, sepY, x + W - 4, sepY + 1, C_SEP);
+        g.text(font, "Inventory", x + 8, sepY + 2, C_DIM, false);
 
-        // Player inventory slot visuals
-        int playerInvY = lootSlotY + lootRows * 18 + 14;
+        // Player inventory slot backgrounds
+        int playerInvY = GolemMenu.LOOT_Y + lootRows * 18 + 14;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                drawSlot(gfx, x + lootSlotX - 1 + col * 18, topPos + playerInvY - 1 + row * 18);
+                drawSlot(g, x + GolemMenu.PLAYER_INV_X - 1 + col * 18, y + playerInvY - 1 + row * 18);
             }
         }
 
         // Hotbar
         int hotbarY = playerInvY + 58;
         for (int col = 0; col < 9; col++) {
-            drawSlot(gfx, x + lootSlotX - 1 + col * 18, topPos + hotbarY - 1);
+            drawSlot(g, x + GolemMenu.PLAYER_INV_X - 1 + col * 18, y + hotbarY - 1);
         }
     }
 
-    // ??????????? HELPERS ???????????
-    private void drawSlot(GuiGraphicsExtractor gfx, int sx, int sy) {
-        gfx.fill(sx, sy, sx + 18, sy + 1, SLOT_DARK);
-        gfx.fill(sx, sy, sx + 1, sy + 18, SLOT_DARK);
-        gfx.fill(sx + 1, sy + 17, sx + 18, sy + 18, SLOT_LIGHT);
-        gfx.fill(sx + 17, sy + 1, sx + 18, sy + 18, SLOT_LIGHT);
-        gfx.fill(sx + 1, sy + 1, sx + 17, sy + 17, SLOT_BG);
+    // ?????????? DRAWING HELPERS ??????????
+
+    /** Draws a vanilla-style panel background */
+    private void drawPanel(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+        // Fill
+        g.fill(x, y, x + w, y + h, C_BG);
+        // Top highlight
+        g.fill(x, y, x + w, y + 1, C_BORDER_LT);
+        g.fill(x + 1, y + 1, x + w - 1, y + 2, C_BORDER_LT);
+        // Left highlight
+        g.fill(x, y, x + 1, y + h, C_BORDER_LT);
+        g.fill(x + 1, y + 1, x + 2, y + h - 1, C_BORDER_LT);
+        // Bottom shadow
+        g.fill(x, y + h - 1, x + w, y + h, C_BORDER_DK);
+        g.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, C_BORDER_DK);
+        // Right shadow
+        g.fill(x + w - 1, y, x + w, y + h, C_BORDER_DK);
+        g.fill(x + w - 2, y + 1, x + w - 1, y + h - 1, C_BORDER_DK);
     }
 
-    private void drawBorder(GuiGraphicsExtractor gfx, int x, int y, int w, int h, int light, int dark) {
-        gfx.fill(x, y, x + w, y + 1, light);
-        gfx.fill(x, y + h - 1, x + w, y + h, dark);
-        gfx.fill(x, y, x + 1, y + h, light);
-        gfx.fill(x + w - 1, y, x + w, y + h, dark);
-    }
-
-    private void centeredText(GuiGraphicsExtractor gfx, String text, int cx, int y, int color) {
-        gfx.text(font, text, cx - font.width(text) / 2, y, color, false);
+    /** Draws a single 18×18 vanilla-style item slot */
+    private void drawSlot(GuiGraphicsExtractor g, int sx, int sy) {
+        // Top/left shadow
+        g.fill(sx, sy, sx + 18, sy + 1, C_SLOT_DK);
+        g.fill(sx, sy + 1, sx + 1, sy + 17, C_SLOT_DK);
+        // Bottom/right highlight
+        g.fill(sx + 1, sy + 17, sx + 18, sy + 18, C_SLOT_LT);
+        g.fill(sx + 17, sy + 1, sx + 18, sy + 17, C_SLOT_LT);
+        // Inner fill
+        g.fill(sx + 1, sy + 1, sx + 17, sy + 17, C_SLOT_BG);
     }
 
     @Override
-    protected void extractLabels(GuiGraphicsExtractor gfx, int mx, int my) {
-        // Handled per-tab
+    protected void extractLabels(GuiGraphicsExtractor g, int mx, int my) {
+        // handled in extractContents per-tab
     }
 
     private Component getPatrolText() {
         boolean on = menu.getData().get(0) != 0;
-        return Component.literal("Patrol: " + (on ? "\u00a7aON" : "\u00a7cOFF"));
+        return Component.literal(on ? "\u00a72Patrol ON" : "\u00a74Patrol OFF");
     }
 
     private Component getThreatText() {
         int mode = menu.getData().get(1);
         String name = SecurityGolemEntity.ThreatMode.fromOrdinal(mode).name();
-        return Component.literal("Threat Mode: \u00a7e" + name);
+        return Component.literal("Mode: " + name);
     }
 
     private Component getCameraText() {
         boolean on = menu.getData().get(2) != 0;
-        return Component.literal("Camera: " + (on ? "\u00a7aON" : "\u00a77OFF"));
+        return Component.literal(on ? "\u00a72Camera ON" : "\u00a77Camera OFF");
     }
 }
