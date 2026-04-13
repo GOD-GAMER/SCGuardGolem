@@ -1,15 +1,16 @@
 package net.geforcemods.scguardgolem.inventory;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import net.geforcemods.scguardgolem.SCGContent;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.Container;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
-import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
@@ -27,11 +28,30 @@ public class GolemMenu extends AbstractContainerMenu {
     private static final int DATA_CAMERA = 2;
     private static final int DATA_COUNT = 3;
 
-    // Layout constants (must match GolemScreen rendering positions)
-    private static final int MODULE_START_X = 8;
-    private static final int MODULE_START_Y = 18;
-    private static final int LOOT_START_X = 8;
-    private static final int LOOT_START_Y = 84;
+    // Tabs
+    public static final int TAB_SETTINGS = 0;
+    public static final int TAB_MODULES = 1;
+    public static final int TAB_LOOT = 2;
+    private int currentTab = TAB_SETTINGS;
+
+    // Slot groups
+    private final List<ModuleSlot> moduleSlots = new ArrayList<>();
+    private final List<ToggleableSlot> lootSlots = new ArrayList<>();
+    private final List<ToggleableSlot> playerSlots = new ArrayList<>();
+
+    // Module slot layout: 2 rows x 3 cols, centered in 220px GUI
+    // col spacing 50px for breathing room, starting at x=35
+    private static final int MODULE_X = 35;
+    private static final int MODULE_Y = 50;
+    private static final int MODULE_COL_SPACING = 50;
+    private static final int MODULE_ROW_SPACING = 36;
+
+    // Loot slot layout: standard 9-wide, x=22 to center in 220px
+    private static final int LOOT_X = 22;
+    private static final int LOOT_Y = 30;
+
+    // Player inventory: same x, below loot
+    private static final int PLAYER_INV_X = 22;
 
     public GolemMenu(int containerId, Inventory playerInv, SecurityGolemEntity golem) {
         super(SCGContent.GOLEM_MENU.get(), containerId);
@@ -60,30 +80,58 @@ public class GolemMenu extends AbstractContainerMenu {
         };
         addDataSlots(this.data);
 
-        // Module slots (top row: Harming, Speed, Smart; bottom row: Allowlist, Denylist, Storage)
-        for (int i = 0; i < 3; i++) {
-            addSlot(new ModuleSlot(moduleContainer, i, MODULE_START_X + i * 28, MODULE_START_Y));
-        }
-        for (int i = 0; i < 3; i++) {
-            addSlot(new ModuleSlot(moduleContainer, 3 + i, MODULE_START_X + i * 28, MODULE_START_Y + 22));
+        // Module slots
+        for (int row = 0; row < 2; row++) {
+            for (int col = 0; col < 3; col++) {
+                int index = row * 3 + col;
+                ModuleSlot ms = new ModuleSlot(moduleContainer, index,
+                        MODULE_X + col * MODULE_COL_SPACING,
+                        MODULE_Y + row * MODULE_ROW_SPACING);
+                ms.setActiveCheck(() -> currentTab == TAB_MODULES);
+                addSlot(ms);
+                moduleSlots.add(ms);
+            }
         }
 
-        // Loot inventory slots
+        // Loot slots
         for (int row = 0; row < lootRows; row++) {
             for (int col = 0; col < 9; col++) {
                 int slotIndex = row * 9 + col;
                 if (slotIndex < lootContainer.getContainerSize()) {
-                    addSlot(new Slot(lootContainer, slotIndex, LOOT_START_X + col * 18, LOOT_START_Y + row * 18));
+                    ToggleableSlot ts = new ToggleableSlot(lootContainer, slotIndex,
+                            LOOT_X + col * 18,
+                            LOOT_Y + row * 18);
+                    ts.setActiveCheck(() -> currentTab == TAB_LOOT);
+                    addSlot(ts);
+                    lootSlots.add(ts);
                 }
             }
         }
 
-        // Player inventory
-        int playerInvY = LOOT_START_Y + lootRows * 18 + 17;
-        addStandardInventorySlots(playerInv, LOOT_START_X, playerInvY);
+        // Player inventory slots (36 slots: 27 main + 9 hotbar)
+        int playerInvY = LOOT_Y + lootRows * 18 + 14;
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                ToggleableSlot ts = new ToggleableSlot(playerInv, col + (row + 1) * 9,
+                        PLAYER_INV_X + col * 18,
+                        playerInvY + row * 18);
+                ts.setActiveCheck(() -> currentTab == TAB_LOOT);
+                addSlot(ts);
+                playerSlots.add(ts);
+            }
+        }
+        // Hotbar
+        int hotbarY = playerInvY + 58;
+        for (int col = 0; col < 9; col++) {
+            ToggleableSlot ts = new ToggleableSlot(playerInv, col,
+                    PLAYER_INV_X + col * 18,
+                    hotbarY);
+            ts.setActiveCheck(() -> currentTab == TAB_LOOT);
+            addSlot(ts);
+            playerSlots.add(ts);
+        }
     }
 
-    // Client-side constructor from network buffer
     public GolemMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         this(containerId, playerInv, findGolem(playerInv, buf));
     }
@@ -95,29 +143,32 @@ public class GolemMenu extends AbstractContainerMenu {
         throw new IllegalStateException("No SecurityGolemEntity with id " + entityId);
     }
 
+    public void setTab(int tab) {
+        this.currentTab = tab;
+    }
+
+    public int getCurrentTab() { return currentTab; }
+
     @Override
     public ItemStack quickMoveStack(Player player, int slotIndex) {
         Slot slot = slots.get(slotIndex);
-        if (!slot.hasItem()) return ItemStack.EMPTY;
+        if (!slot.hasItem() || !slot.isActive()) return ItemStack.EMPTY;
 
         ItemStack stack = slot.getItem();
         ItemStack copy = stack.copy();
-        int moduleSlotCount = SecurityGolemEntity.MODULE_SLOTS;
-        int lootSlotCount = lootRows * 9;
-        int totalContainerSlots = moduleSlotCount + lootSlotCount;
 
-        if (slotIndex < moduleSlotCount) {
-            // From module slot ? player inventory
-            if (!moveItemStackTo(stack, totalContainerSlots, slots.size(), true)) return ItemStack.EMPTY;
-        } else if (slotIndex < totalContainerSlots) {
-            // From loot slot ? player inventory
-            if (!moveItemStackTo(stack, totalContainerSlots, slots.size(), true)) return ItemStack.EMPTY;
-        } else {
-            // From player inventory ? try modules first, then loot
-            if (!moveItemStackTo(stack, 0, moduleSlotCount, false)) {
-                if (!moveItemStackTo(stack, moduleSlotCount, totalContainerSlots, false)) {
-                    return ItemStack.EMPTY;
-                }
+        int moduleStart = 0;
+        int moduleEnd = moduleSlots.size();
+        int lootStart = moduleEnd;
+        int lootEnd = lootStart + lootSlots.size();
+        int playerStart = lootEnd;
+        int playerEnd = playerStart + playerSlots.size();
+
+        if (currentTab == TAB_LOOT) {
+            if (slotIndex >= lootStart && slotIndex < lootEnd) {
+                if (!moveItemStackTo(stack, playerStart, playerEnd, true)) return ItemStack.EMPTY;
+            } else if (slotIndex >= playerStart && slotIndex < playerEnd) {
+                if (!moveItemStackTo(stack, lootStart, lootEnd, false)) return ItemStack.EMPTY;
             }
         }
 
@@ -134,20 +185,19 @@ public class GolemMenu extends AbstractContainerMenu {
         return golem.isAlive() && golem.distanceToSqr(player) < 64.0;
     }
 
-    // Button click handler for patrol/threat/camera toggles
     @Override
     public boolean clickMenuButton(Player player, int buttonId) {
         switch (buttonId) {
-            case 0 -> { // Toggle patrol
+            case 0 -> {
                 data.set(DATA_PATROL, data.get(DATA_PATROL) == 0 ? 1 : 0);
                 return true;
             }
-            case 1 -> { // Cycle threat mode
+            case 1 -> {
                 int next = (data.get(DATA_THREAT) + 1) % SecurityGolemEntity.ThreatMode.values().length;
                 data.set(DATA_THREAT, next);
                 return true;
             }
-            case 2 -> { // Toggle camera
+            case 2 -> {
                 data.set(DATA_CAMERA, data.get(DATA_CAMERA) == 0 ? 1 : 0);
                 return true;
             }
