@@ -27,11 +27,11 @@ public class GolemMenu extends AbstractContainerMenu {
     private static final int DATA_CAMERA = 2;
     private static final int DATA_COUNT = 3;
 
-    // Layout constants
+    // Layout constants (must match GolemScreen rendering positions)
     private static final int MODULE_START_X = 8;
     private static final int MODULE_START_Y = 18;
     private static final int LOOT_START_X = 8;
-    private static final int LOOT_START_Y = 62;
+    private static final int LOOT_START_Y = 84;
 
     public GolemMenu(int containerId, Inventory playerInv, SecurityGolemEntity golem) {
         super(SCGContent.GOLEM_MENU.get(), containerId);
@@ -79,7 +79,7 @@ public class GolemMenu extends AbstractContainerMenu {
         }
 
         // Player inventory
-        int playerInvY = LOOT_START_Y + lootRows * 18 + 14;
+        int playerInvY = LOOT_START_Y + lootRows * 18 + 17;
         addStandardInventorySlots(playerInv, LOOT_START_X, playerInvY);
     }
 
