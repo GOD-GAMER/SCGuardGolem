@@ -68,6 +68,11 @@ dependencies {
     compileOnly(fileTree("libs") { include("*.jar") })
 }
 
+// Add SC jar to dev runtime so runClient can find it
+configurations.named("runtimeClasspath") {
+    extendsFrom(configurations.getByName("compileOnly"))
+}
+
 tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge::class) {
     dependsOn(tasks.jar)
     disableVersionDetection()
