@@ -59,8 +59,8 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Wire Cutters").withStyle(highlight))
                         .append(Component.literal("\nto right-click your\ngolem and open the\nconfiguration GUI.\n\n").withStyle(body))
                         .append(Component.literal("The GUI lets you:\n").withStyle(dim))
-                        .append(Component.literal("- Insert modules\n- Toggle patrol\n- Set threat mode\n- Toggle camera\n- Access loot chest").withStyle(dim))),
-                // Page 4 — Module Upgrades
+                        .append(Component.literal("- Insert modules\n- Toggle patrol\n- Set threat mode\n- Access loot chest").withStyle(dim))),
+                // Page 4
                 page(Component.empty()
                         .append(Component.literal("Module Upgrades\n\n").withStyle(header))
                         .append(Component.literal("Place SC modules in\nthe GUI slots.\nStack count = level\n(max 5).\n\n").withStyle(body))
@@ -69,32 +69,49 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Speed Module\n").withStyle(highlight))
                         .append(Component.literal("+0.03 speed/level\n\n").withStyle(dim))
                         .append(Component.literal("Smart Module\n").withStyle(highlight))
-                        .append(Component.literal("+4 block detection\nradius per level").withStyle(dim))),
-                // Page 5 — Player Lists
-                page(Component.empty()
-                        .append(Component.literal("Player Lists\n\n").withStyle(header))
-                        .append(Component.literal("Allowlist Module\n").withStyle(highlight))
-                        .append(Component.literal("Players on this\nmodule are never\nattacked.\n\n").withStyle(body))
-                        .append(Component.literal("Denylist Module\n").withStyle(highlight))
-                        .append(Component.literal("Players on this\nmodule are always\nattacked on sight.\n\n").withStyle(body))
-                        .append(Component.literal("Edit player names\non modules before\nplacing them.").withStyle(dim))),
-                // Page 6 — Loot Chest
-                page(Component.empty()
-                        .append(Component.literal("Loot Chest\n\n").withStyle(header))
+                        .append(Component.literal("+4 block detection\nradius per level\n\n").withStyle(dim))
                         .append(Component.literal("Storage Module\n").withStyle(highlight))
-                        .append(Component.literal("Enables loot\ncollection. Stack\ncount = extra rows\n(1-6 rows total).\n\n").withStyle(body))
-                        .append(Component.literal("The golem auto-\npicks up items near\nit when storage\nmodules are present.\n\n").withStyle(dim))
-                        .append(Component.literal("Loot is accessible\nvia the GUI.").withStyle(dim))),
-                // Page 7 — Camera
+                        .append(Component.literal("Enables loot pickup\n+1 row per level").withStyle(dim))),
+                // Page 5 — Allow/Deny Lists
                 page(Component.empty()
-                        .append(Component.literal("Camera System\n\n").withStyle(header))
-                        .append(Component.literal("Toggle the camera\nbutton in the GUI\nto enable the golem\ncamera.\n\n").withStyle(body))
-                        .append(Component.literal("When enabled, you\ncan monitor the\ngolem's perspective\nusing SC Camera\nMonitor.").withStyle(dim))),
+                        .append(Component.literal("Allow / Deny Lists\n\n").withStyle(header))
+                        .append(Component.literal("Open the ").withStyle(body))
+                        .append(Component.literal("Lists").withStyle(highlight))
+                        .append(Component.literal(" tab in\nthe GUI.\n\n").withStyle(body))
+                        .append(Component.literal("Look at a mob or\nplayer and click\n").withStyle(body))
+                        .append(Component.literal("+ Allow").withStyle(highlight))
+                        .append(Component.literal(" or ").withStyle(body))
+                        .append(Component.literal("+ Deny").withStyle(highlight))
+                        .append(Component.literal(".\n\n").withStyle(body))
+                        .append(Component.literal("Click the ").withStyle(body))
+                        .append(Component.literal("[x]").withStyle(highlight))
+                        .append(Component.literal(" beside a\nname to remove it.").withStyle(dim))),
+                // Page 6 — Waypoints
+                page(Component.empty()
+                        .append(Component.literal("Setting Waypoints\n\n").withStyle(header))
+                        .append(Component.literal("Hold a ").withStyle(body))
+                        .append(Component.literal("Reinforced Lever").withStyle(highlight))
+                        .append(Component.literal("\nand ").withStyle(body))
+                        .append(Component.literal("crouch + left-click").withStyle(highlight))
+                        .append(Component.literal("\nthe ground to add a\nwaypoint for the\nnearest golem.\n\n").withStyle(body))
+                        .append(Component.literal("Use the ").withStyle(body))
+                        .append(Component.literal("Clear Route").withStyle(highlight))
+                        .append(Component.literal("\nbutton in the Config\ntab to delete all\nwaypoints.").withStyle(body))),
+                // Page 7 — Bell Recall
+                page(Component.empty()
+                        .append(Component.literal("Bell Recall\n\n").withStyle(header))
+                        .append(Component.literal("Right-click a ").withStyle(body))
+                        .append(Component.literal("Bell").withStyle(highlight))
+                        .append(Component.literal("\nto recall all your\ngolems to their\nfirst waypoint.\n\n").withStyle(body))
+                        .append(Component.literal("Recalled golems\nstop patrolling and\nwait at the start.\n\n").withStyle(dim))
+                        .append(Component.literal("Use the ").withStyle(body))
+                        .append(Component.literal("Patrol").withStyle(highlight))
+                        .append(Component.literal(" button\nin the GUI to\nrestart patrol.").withStyle(body))),
                 // Page 8 — Patrol & Threats
                 page(Component.empty()
                         .append(Component.literal("Patrol & Threats\n\n").withStyle(header))
                         .append(Component.literal("Toggle patrol and\nthreat mode in the\nGUI or via commands.\n\n").withStyle(body))
-                        .append(Component.literal("/scgolem patrol\n  start | stop\n  speed <0.1-3.0>\n  waypoint ...\n\n").withStyle(cmd))
+                        .append(Component.literal("/scgolem patrol\n  start | stop\n  speed <0.1-3.0>\n\n").withStyle(cmd))
                         .append(Component.literal("/scgolem threat\n  warn|follow|attack").withStyle(cmd))),
                 // Page 9 — Other Commands
                 page(Component.empty()
