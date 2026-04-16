@@ -12,8 +12,6 @@ import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
-import net.geforcemods.securitycraft.SCContent;
-import net.geforcemods.securitycraft.components.ListModuleData;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
 import net.minecraft.core.BlockPos;
@@ -62,17 +60,16 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Integer> THREAT_MODE =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Boolean> HAS_CAMERA =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
-
-    // Module slots: 0=Harming, 1=Speed, 2=Smart, 3=Allowlist, 4=Denylist, 5=Storage
-    public static final int MODULE_SLOTS = 6;
+    private static final EntityDataAccessor<String> IGNORE_LIST_DATA =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<String> ATTACK_LIST_DATA =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
+    // Module slots
+    public static final int MODULE_SLOTS = 4;
     public static final int SLOT_HARMING = 0;
     public static final int SLOT_SPEED = 1;
     public static final int SLOT_SMART = 2;
-    public static final int SLOT_ALLOWLIST = 3;
-    public static final int SLOT_DENYLIST = 4;
-    public static final int SLOT_STORAGE = 5;
+    public static final int SLOT_STORAGE = 3;
 
     public static final int MAX_UPGRADE_LEVEL = 5;
     public static final int MAX_LOOT_ROWS = 6;
@@ -88,6 +85,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             super.setChanged();
             onModulesChanged();
         }
+        @Override
+        public int getMaxStackSize(ItemStack stack) {
+            return MAX_UPGRADE_LEVEL;
+        }
     };
     private SimpleContainer lootInventory = new SimpleContainer(BASE_LOOT_SLOTS);
 
@@ -95,6 +96,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     private List<BlockPos> waypointsView;
     private int currentWaypointIndex = 0;
     private double patrolSpeed = 1.0;
+
+    // Name-based allow/deny lists
+    public static final int MAX_LIST_ENTRIES = 8;
+    private final TreeSet<String> ignoreList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+    private final TreeSet<String> attackList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+
+    // Bell recall state
+    private boolean recalling = false;
 
     private String lootPassword = "";
     private int pickupCooldown = 0;
@@ -121,7 +130,8 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         builder.define(OWNER_UUID, "");
         builder.define(OWNER_NAME, "");
         builder.define(THREAT_MODE, ThreatMode.WARN.ordinal());
-        builder.define(HAS_CAMERA, false);
+        builder.define(IGNORE_LIST_DATA, "");
+        builder.define(ATTACK_LIST_DATA, "");
     }
 
     @Override
@@ -167,21 +177,16 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     @Override
     public void writeClientSideData(AbstractContainerMenu menu, net.minecraft.network.RegistryFriendlyByteBuf buf) {
         buf.writeInt(this.getId());
+        buf.writeInt(getLootRows());
     }
 
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
             if (isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
-                player.sendSystemMessage(Component.literal("\u00a76[Security Golem] \u00a7fStatus:"));
-                player.sendSystemMessage(Component.literal("  Patrol: " + (isPatrolling() ? "\u00a7aActive" : "\u00a7cStopped")
-                        + " \u00a7f(" + waypoints.size() + " waypoints)"));
-                player.sendSystemMessage(Component.literal("  Threat Mode: \u00a7e" + getThreatMode().name()));
-                player.sendSystemMessage(Component.literal("  Modules: Harming=" + getModuleCount(SLOT_HARMING)
-                        + " Speed=" + getModuleCount(SLOT_SPEED)
-                        + " Smart=" + getModuleCount(SLOT_SMART)));
-                player.sendSystemMessage(Component.literal("  Camera: " + (hasCamera() ? "\u00a7aInstalled" : "\u00a7cNone")
-                        + " \u00a7f| Loot: " + getLootItemCount() + " items"));
+                if (player instanceof ServerPlayer serverPlayer) {
+                    serverPlayer.openMenu(this);
+                }
                 return InteractionResult.SUCCESS;
             } else {
                 player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
@@ -215,8 +220,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             case SLOT_HARMING -> ModuleType.HARMING;
             case SLOT_SPEED -> ModuleType.SPEED;
             case SLOT_SMART -> ModuleType.SMART;
-            case SLOT_ALLOWLIST -> ModuleType.ALLOWLIST;
-            case SLOT_DENYLIST -> ModuleType.DENYLIST;
             case SLOT_STORAGE -> ModuleType.STORAGE;
             default -> null;
         };
@@ -230,8 +233,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     }
 
     private void onModulesChanged() {
-        if (level() != null && !level().isClientSide()) {
-            applyUpgrades();
+        if (level() != null) {
+            if (!level().isClientSide()) {
+                applyUpgrades();
+            }
             resizeLootInventory();
         }
     }
@@ -249,37 +254,56 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         if (s != null) s.setBaseValue(0.25D + getSpeedUpgrade() * SPEED_PER_LEVEL);
     }
 
-    // -- Module-driven player lists --
-    public boolean isOnIgnoreList(String playerName) {
-        ItemStack stack = moduleInventory.getItem(SLOT_ALLOWLIST);
-        if (stack.isEmpty()) return false;
-        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
-        return data != null && data.isPlayerOnList(playerName);
-    }
-
-    public boolean isOnAlwaysAttackList(String playerName) {
-        ItemStack stack = moduleInventory.getItem(SLOT_DENYLIST);
-        if (stack.isEmpty()) return false;
-        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
-        return data != null && data.isPlayerOnList(playerName);
-    }
-
+    // -- Name-based allow/deny lists --
+    public boolean isOnIgnoreList(String name) { return ignoreList.contains(name); }
+    public boolean isOnAlwaysAttackList(String name) { return attackList.contains(name); }
     public Set<String> getIgnoreListNames() {
-        ItemStack stack = moduleInventory.getItem(SLOT_ALLOWLIST);
-        if (stack.isEmpty()) return Set.of();
-        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
-        return data != null ? Set.copyOf(data.players()) : Set.of();
+        if (level() != null && level().isClientSide()) {
+            String data = entityData.get(IGNORE_LIST_DATA);
+            if (data.isEmpty()) return Set.of();
+            TreeSet<String> set = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (String s : data.split("\0")) if (!s.isEmpty()) set.add(s);
+            return set;
+        }
+        return Collections.unmodifiableSet(ignoreList);
+    }
+    public Set<String> getAlwaysAttackListNames() {
+        if (level() != null && level().isClientSide()) {
+            String data = entityData.get(ATTACK_LIST_DATA);
+            if (data.isEmpty()) return Set.of();
+            TreeSet<String> set = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (String s : data.split("\0")) if (!s.isEmpty()) set.add(s);
+            return set;
+        }
+        return Collections.unmodifiableSet(attackList);
     }
 
-    public Set<String> getAlwaysAttackListNames() {
-        ItemStack stack = moduleInventory.getItem(SLOT_DENYLIST);
-        if (stack.isEmpty()) return Set.of();
-        ListModuleData data = stack.get(SCContent.LIST_MODULE_DATA.get());
-        return data != null ? Set.copyOf(data.players()) : Set.of();
+    private void syncLists() {
+        entityData.set(IGNORE_LIST_DATA, String.join("\0", ignoreList));
+        entityData.set(ATTACK_LIST_DATA, String.join("\0", attackList));
     }
+
+    public boolean addToIgnoreList(String name) {
+        if (name == null || name.isBlank() || ignoreList.size() >= MAX_LIST_ENTRIES) return false;
+        attackList.remove(name);
+        boolean added = ignoreList.add(name);
+        syncLists();
+        return added;
+    }
+    public boolean removeFromIgnoreList(String name) { boolean r = ignoreList.remove(name); syncLists(); return r; }
+
+    public boolean addToAttackList(String name) {
+        if (name == null || name.isBlank() || attackList.size() >= MAX_LIST_ENTRIES) return false;
+        ignoreList.remove(name);
+        boolean added = attackList.add(name);
+        syncLists();
+        return added;
+    }
+    public boolean removeFromAttackList(String name) { boolean r = attackList.remove(name); syncLists(); return r; }
 
     // -- Loot Inventory --
     public SimpleContainer getLootInventory() { return lootInventory; }
+    public void setLootInventory(SimpleContainer inv) { this.lootInventory = inv; }
 
     public int getLootSlotCount() {
         int storageLevel = getModuleCount(SLOT_STORAGE);
@@ -298,10 +322,12 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         for (int i = 0; i < Math.min(lootInventory.getContainerSize(), needed); i++) {
             newInv.setItem(i, lootInventory.getItem(i));
         }
-        for (int i = needed; i < lootInventory.getContainerSize(); i++) {
-            ItemStack overflow = lootInventory.getItem(i);
-            if (!overflow.isEmpty() && level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                spawnAtLocation(serverLevel, overflow);
+        if (level() != null && !level().isClientSide()) {
+            for (int i = needed; i < lootInventory.getContainerSize(); i++) {
+                ItemStack overflow = lootInventory.getItem(i);
+                if (!overflow.isEmpty() && level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                    spawnAtLocation(serverLevel, overflow);
+                }
             }
         }
         lootInventory = newInv;
@@ -337,9 +363,22 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         pickupCooldown = 10;
     }
 
-    // -- Camera --
-    public boolean hasCamera() { return entityData.get(HAS_CAMERA); }
-    public void setHasCamera(boolean c) { entityData.set(HAS_CAMERA, c); }
+    // -- Bell Recall --
+    public boolean isRecalling() { return recalling; }
+    public void setRecalling(boolean r) { this.recalling = r; }
+
+    public void recallToStart() {
+        if (!waypoints.isEmpty()) {
+            currentWaypointIndex = 0;
+            recalling = true;
+            setPatrolling(true);
+        }
+    }
+
+    public void finishRecall() {
+        recalling = false;
+        setPatrolling(false);
+    }
 
     // -- Patrol --
     public List<BlockPos> getWaypoints() {
@@ -396,8 +435,17 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
-        tag.putBoolean("HasCamera", hasCamera());
         tag.putString("LootPassword", lootPassword);
+        tag.putBoolean("Recalling", recalling);
+
+        CompoundTag listsTag = new CompoundTag();
+        listsTag.putInt("IgnoreCount", ignoreList.size());
+        int idx = 0;
+        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
+        listsTag.putInt("AttackCount", attackList.size());
+        idx = 0;
+        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
+        tag.store("AllowDenyLists", CompoundTag.CODEC, listsTag);
 
         CompoundTag waypointTag = new CompoundTag();
         waypointTag.putInt("Count", waypoints.size());
@@ -422,8 +470,18 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         patrolSpeed = tag.getDoubleOr("PatrolSpeed", 1.0);
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
         entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
-        entityData.set(HAS_CAMERA, tag.getBooleanOr("HasCamera", false));
         lootPassword = tag.getStringOr("LootPassword", "");
+        recalling = tag.getBooleanOr("Recalling", false);
+
+        ignoreList.clear();
+        attackList.clear();
+        tag.read("AllowDenyLists", CompoundTag.CODEC).ifPresent(lt -> {
+            int ic = lt.getIntOr("IgnoreCount", 0);
+            for (int i = 0; i < ic; i++) { String n = lt.getStringOr("Ignore" + i, ""); if (!n.isEmpty()) ignoreList.add(n); }
+            int ac = lt.getIntOr("AttackCount", 0);
+            for (int i = 0; i < ac; i++) { String n = lt.getStringOr("Attack" + i, ""); if (!n.isEmpty()) attackList.add(n); }
+        });
+        syncLists();
 
         waypoints.clear();
         waypointsView = null;
