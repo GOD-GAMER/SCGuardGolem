@@ -5,197 +5,548 @@ import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
 
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
 public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
-    private static final Identifier GUI_TEXTURE = Identifier.parse("scguardgolem:textures/gui/golem_gui.png");
+    // ?? Sprites ??
+    private static final Identifier PANEL_SPRITE = Identifier.parse("scguardgolem:scg_panel");
+    private static final Identifier SLOT_SPRITE = Identifier.withDefaultNamespace("container/slot");
+    private static final Identifier TAB_SPRITE = Identifier.withDefaultNamespace("widget/tab");
+    private static final Identifier TAB_SELECTED_SPRITE = Identifier.withDefaultNamespace("widget/tab_selected");
+    private static final Identifier TAB_HIGHLIGHTED_SPRITE = Identifier.withDefaultNamespace("widget/tab_highlighted");
+    private static final Identifier TAB_SEL_HIGHLIGHTED_SPRITE = Identifier.withDefaultNamespace("widget/tab_selected_highlighted");
+    private static final Identifier SCROLLER_BG_SPRITE = Identifier.withDefaultNamespace("widget/scroller_background");
+    private static final Identifier SCROLLER_SPRITE = Identifier.withDefaultNamespace("widget/scroller");
 
-    // Background colors (SecurityCraft dark theme)
-    private static final int BG_PANEL = 0xFF1A1A2E;
-    private static final int BORDER_LIGHT = 0xFF3D3D5C;
-    private static final int BORDER_DARK = 0xFF0A0A15;
-    private static final int SLOT_BG = 0xFF111122;
-    private static final int SLOT_LIGHT = 0xFF2A2A44;
-    private static final int SLOT_DARK = 0xFF060610;
-    private static final int TITLE_BG = 0xFF16213E;
-    private static final int SEPARATOR = 0xFF3D3D5C;
+    // ?? Text colors (ARGB) ??
+    private static final int C_TITLE = 0xFF404040;
+    private static final int C_DIM   = 0xFF666666;
+    private static final int C_SEP   = 0xFFAAAAAA;
 
-    private static final int LABEL_MODULE = 0xFF55FFFF;
-    private static final int LABEL_SECTION = 0xFFAAAAAA;
-    private static final int LABEL_TITLE = 0xFF55FF55;
+    // ?? Dimensions ??
+    private static final int W = 176;
+    private static final int TAB_H = 20;
+    private static final int SCROLLER_W = 8;
+    private final int H;
 
-    // Layout
-    private static final int TITLE_H = 18;
-    private static final int MODULE_AREA_H = 50;
-    private static final int LOOT_HEADER_H = 14;
-    private static final int INV_LABEL_H = 12;
-    private static final int INV_GAP = 4;
-    private static final int HOTBAR_GAP = 4;
-
-    private Button patrolButton;
-    private Button threatButton;
-    private Button cameraButton;
+    // Toggle buttons for config tab
+    private Button patrolBtn, threatBtn, clearRouteBtn;
+    // Lists tab: picker scroll offset
+    private int pickerScroll = 0;
+    private List<PickerEntry> pickerEntries = List.of();
+    // Dynamic buttons for Lists tab
+    private final List<Button> listButtons = new ArrayList<>();
+    private boolean listButtonsDirty = true;
+    private int lastIgnoreSize = -1;
+    private int lastAttackSize = -1;
 
     public GolemScreen(GolemMenu menu, Inventory playerInv, Component title) {
-        super(menu, playerInv, title, 176, calculateHeight(menu.getLootRows()));
-        this.inventoryLabelY = this.imageHeight - 94;
-    }
-
-    private static int calculateHeight(int lootRows) {
-        return TITLE_H + MODULE_AREA_H + LOOT_HEADER_H + lootRows * 18 + INV_LABEL_H + INV_GAP + 54 + HOTBAR_GAP + 18 + 4;
+        super(menu, playerInv, title, W, menu.getGuiHeight());
+        this.H = menu.getGuiHeight();
+        this.inventoryLabelY = 999;
+        this.titleLabelY = 999;
     }
 
     @Override
     protected void init() {
         super.init();
-        int bx = leftPos + 97;
-        int by = topPos + TITLE_H + 2;
+        // Recenter vertically to account for tabs above the panel
+        int totalH = H + TAB_H;
+        topPos = Math.max(TAB_H, (height - totalH) / 2 + TAB_H);
+        leftPos = (width - imageWidth) / 2;
 
-        patrolButton = addRenderableWidget(
-                Button.builder(getPatrolText(), btn -> {
-                    clickButton(0);
-                    btn.setMessage(getPatrolText());
-                }).bounds(bx, by, 72, 14).build());
+        int x = leftPos;
+        int y = topPos;
 
-        threatButton = addRenderableWidget(
-                Button.builder(getThreatText(), btn -> {
-                    clickButton(1);
-                    btn.setMessage(getThreatText());
-                }).bounds(bx, by + 17, 72, 14).build());
+        // ?? Config tab: 3 toggle buttons below modules ??
+        int modBottom = GolemMenu.MOD_Y + 2 * GolemMenu.MOD_ROW;
+        int btnY = y + modBottom + 4;
+        int btnW = 54;
+        int btnH = 20;
+        int btnGap = 5;
 
-        cameraButton = addRenderableWidget(
-                Button.builder(getCameraText(), btn -> {
-                    clickButton(2);
-                    btn.setMessage(getCameraText());
-                }).bounds(bx, by + 34, 72, 14).build());
+        patrolBtn = addRenderableWidget(
+            Button.builder(getPatrolText(), b -> { clickButton(0); b.setMessage(getPatrolText()); })
+                .bounds(x + 8, btnY, btnW, btnH).build());
+        threatBtn = addRenderableWidget(
+            Button.builder(getThreatText(), b -> { clickButton(1); b.setMessage(getThreatText()); })
+                .bounds(x + 8 + btnW + btnGap, btnY, btnW, btnH).build());
+        clearRouteBtn = addRenderableWidget(
+            Button.builder(Component.literal("\u00a7cClear"), b -> clickButton(2))
+                .bounds(x + 8 + (btnW + btnGap) * 2, btnY, 40, btnH).build());
+
+        switchTab(GolemMenu.TAB_CONFIG);
+    }
+
+    private void switchTab(int tab) {
+        menu.setTab(tab);
+        boolean config = (tab == GolemMenu.TAB_CONFIG);
+        patrolBtn.visible = config;
+        threatBtn.visible = config;
+        clearRouteBtn.visible = config;
+        clearListButtons();
+        if (tab == GolemMenu.TAB_LISTS) {
+            pickerScroll = 0;
+            refreshPickerEntries();
+            listButtonsDirty = true;
+        }
+        clickButton(200 + tab);
     }
 
     private void clickButton(int id) {
-        if (minecraft != null && minecraft.gameMode != null) {
+        if (minecraft != null && minecraft.gameMode != null)
             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
+    }
+
+    // ?? Tab click handling ??
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean handled) {
+        if (!handled && event.button() == 0) {
+            double mouseX = event.x();
+            double mouseY = event.y();
+            int tabW = W / 3;
+            int tabY = topPos - TAB_H;
+            if (mouseY >= tabY && mouseY < topPos) {
+                if (mouseX >= leftPos && mouseX < leftPos + tabW) {
+                    switchTab(GolemMenu.TAB_CONFIG);
+                    return true;
+                } else if (mouseX >= leftPos + tabW && mouseX < leftPos + tabW * 2) {
+                    switchTab(GolemMenu.TAB_LOOT);
+                    return true;
+                } else if (mouseX >= leftPos + tabW * 2 && mouseX < leftPos + W) {
+                    switchTab(GolemMenu.TAB_LISTS);
+                    return true;
+                }
+            }
         }
+        return super.mouseClicked(event, handled);
+    }
+
+    // ?? Scroll support ??
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (menu.getCurrentTab() == GolemMenu.TAB_LISTS) {
+            int maxPickerScroll = Math.max(0, pickerEntries.size() - getPickerVisibleCount(calcPickerStartY(topPos)));
+            if (maxPickerScroll > 0) {
+                int delta = scrollY > 0 ? -1 : 1;
+                pickerScroll = Math.max(0, Math.min(pickerScroll + delta, maxPickerScroll));
+                listButtonsDirty = true;
+                return true;
+            }
+        }
+        if (menu.getCurrentTab() == GolemMenu.TAB_LOOT && menu.getMaxScroll() > 0) {
+            int delta = scrollY > 0 ? -1 : 1;
+            int newOffset = menu.getScrollOffset() + delta;
+            newOffset = Math.max(0, Math.min(newOffset, menu.getMaxScroll()));
+            if (newOffset != menu.getScrollOffset()) {
+                menu.setScrollOffset(newOffset);
+                if (minecraft != null && minecraft.gameMode != null)
+                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 100 + newOffset);
+            }
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-        extractTooltip(graphics, mouseX, mouseY);
-
-        patrolButton.setMessage(getPatrolText());
-        threatButton.setMessage(getThreatText());
-        cameraButton.setMessage(getCameraText());
+    public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
+        super.extractRenderState(g, mx, my, pt);
+        patrolBtn.setMessage(getPatrolText());
+        threatBtn.setMessage(getThreatText());
     }
 
     @Override
-    public void extractContents(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+    public void extractContents(GuiGraphicsExtractor g, int mx, int my, float pt) {
         int x = leftPos;
         int y = topPos;
-        int w = imageWidth;
-        int h = imageHeight;
+        int tabW = W / 3;
+        int tabY = y - TAB_H;
+        int curTab = menu.getCurrentTab();
 
-        // === Main panel background ===
-        graphics.fill(x, y, x + w, y + h, BG_PANEL);
-
-        // === Outer border (3D effect) ===
-        graphics.fill(x, y, x + w, y + 1, BORDER_LIGHT);
-        graphics.fill(x + 1, y + 1, x + w - 1, y + 2, BORDER_DARK);
-        graphics.fill(x, y + h - 1, x + w, y + h, BORDER_DARK);
-        graphics.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, BORDER_LIGHT);
-        graphics.fill(x, y, x + 1, y + h, BORDER_LIGHT);
-        graphics.fill(x + 1, y + 1, x + 2, y + h - 1, BORDER_DARK);
-        graphics.fill(x + w - 1, y, x + w, y + h, BORDER_DARK);
-        graphics.fill(x + w - 2, y + 1, x + w - 1, y + h - 1, BORDER_LIGHT);
-
-        // === Title bar ===
-        graphics.fill(x + 2, y + 2, x + w - 2, y + TITLE_H, TITLE_BG);
-        graphics.fill(x + 2, y + TITLE_H, x + w - 2, y + TITLE_H + 1, SEPARATOR);
-
-        // === Module section ===
-        int moduleY = y + TITLE_H + 1;
-        graphics.fill(x + 2, moduleY, x + 90, moduleY + MODULE_AREA_H, 0xFF151528);
-
-        int[][] moduleSlotPos = {
-            {7, 17}, {35, 17}, {63, 17},
-            {7, 39}, {35, 39}, {63, 39}
-        };
-        String[] topLabels = {"Harm", "Speed", "Smart"};
-        String[] botLabels = {"Allow", "Deny", "Store"};
-
-        for (int i = 0; i < 6; i++) {
-            drawSlot(graphics, x + moduleSlotPos[i][0], y + moduleSlotPos[i][1]);
-        }
-
+        // ?? Draw 3 tabs ??
+        String[] tabLabels = {"Config", "Loot", "Lists"};
         for (int i = 0; i < 3; i++) {
-            int lx = x + moduleSlotPos[i][0] + 1;
-            graphics.text(font, topLabels[i], lx, y + TITLE_H + 3, LABEL_MODULE, false);
-            graphics.text(font, botLabels[i], lx, y + TITLE_H + 25, LABEL_MODULE, false);
+            int tx = x + i * tabW;
+            int tw = (i == 2) ? W - tabW * 2 : tabW; // last tab gets remainder
+            boolean sel = (curTab == i);
+            boolean hover = mx >= tx && mx < tx + tw && my >= tabY && my < y;
+            Identifier spr;
+            if (sel) spr = hover ? TAB_SEL_HIGHLIGHTED_SPRITE : TAB_SELECTED_SPRITE;
+            else spr = hover ? TAB_HIGHLIGHTED_SPRITE : TAB_SPRITE;
+
+            if (!sel) g.blitSprite(RenderPipelines.GUI_TEXTURED, spr, tx, tabY, tw, TAB_H + 3);
         }
 
-        // Vertical separator between modules and buttons
-        graphics.fill(x + 92, moduleY + 2, x + 93, moduleY + MODULE_AREA_H - 2, SEPARATOR);
+        // ?? Panel background ??
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, PANEL_SPRITE, x, y, W, H);
 
-        // === Loot section ===
-        int lootHeaderY = moduleY + MODULE_AREA_H;
-        graphics.fill(x + 2, lootHeaderY, x + w - 2, lootHeaderY + 1, SEPARATOR);
-        graphics.text(font, "Loot Chest", x + 8, lootHeaderY + 3, LABEL_SECTION, false);
+        // ?? Selected tab on top ??
+        for (int i = 0; i < 3; i++) {
+            if (curTab != i) continue;
+            int tx = x + i * tabW;
+            int tw = (i == 2) ? W - tabW * 2 : tabW;
+            boolean hover = mx >= tx && mx < tx + tw && my >= tabY && my < y;
+            Identifier spr = hover ? TAB_SEL_HIGHLIGHTED_SPRITE : TAB_SELECTED_SPRITE;
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, spr, tx, tabY, tw, TAB_H + 3);
+        }
 
-        int lootRows = menu.getLootRows();
-        int lootSlotY = lootHeaderY + LOOT_HEADER_H;
-        for (int row = 0; row < lootRows; row++) {
+        // ?? Tab labels ??
+        int tabTextY = tabY + (TAB_H - font.lineHeight) / 2;
+        for (int i = 0; i < 3; i++) {
+            int tx = x + i * tabW;
+            int tw = (i == 2) ? W - tabW * 2 : tabW;
+            g.text(font, tabLabels[i],
+                tx + (tw - font.width(tabLabels[i])) / 2, tabTextY,
+                curTab == i ? C_TITLE : C_DIM, false);
+        }
+
+        // ?? Title ??
+        String titleText = switch (curTab) {
+            case GolemMenu.TAB_CONFIG -> "Security Golem";
+            case GolemMenu.TAB_LOOT -> "Collected Loot";
+            case GolemMenu.TAB_LISTS -> "Allow / Deny Lists";
+            default -> "";
+        };
+        g.text(font, titleText, x + 8, y + 6, C_TITLE, false);
+
+        // ?? Tab content ??
+        switch (curTab) {
+            case GolemMenu.TAB_CONFIG -> drawConfigTab(g, x, y);
+            case GolemMenu.TAB_LOOT -> drawLootTab(g, x, y);
+            case GolemMenu.TAB_LISTS -> drawListsTab(g, x, y);
+        }
+
+        // ?? Player inventory ??
+        drawPlayerInv(g, x, y);
+
+        // ?? Vanilla slot rendering ??
+        super.extractContents(g, mx, my, pt);
+    }
+
+    // ?????????? CONFIG TAB ??????????
+    private void drawConfigTab(GuiGraphicsExtractor g, int x, int y) {
+        String[] labels = {"Harm", "Speed", "Smart", "Store"};
+        for (int i = 0; i < 4; i++) {
+            int col = i % 2;
+            int row = i / 2;
+            int sx = x + GolemMenu.MOD_X - 1 + col * GolemMenu.MOD_COL;
+            int sy = y + GolemMenu.MOD_Y - 1 + row * GolemMenu.MOD_ROW;
+
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_SPRITE, sx, sy, 18, 18);
+            g.text(font, labels[i], sx + 1, sy + 19, C_DIM, false);
+        }
+
+        // ?? Status info below buttons ??
+        int modBottom = GolemMenu.MOD_Y + 2 * GolemMenu.MOD_ROW;
+        int statusY = y + modBottom + 28;
+
+        String owner = menu.getGolem().getOwnerName();
+        g.text(font, "Owner: " + (owner.isEmpty() ? "None" : owner), x + 8, statusY, C_DIM, false);
+
+        String hp = String.format("HP: %.0f/%.0f", menu.getGolem().getHealth(), menu.getGolem().getMaxHealth());
+        g.text(font, hp, x + 90, statusY, C_DIM, false);
+
+        SecurityGolemEntity golem = menu.getGolem();
+        double dmg = 15.0 + golem.getDamageUpgrade() * SecurityGolemEntity.DAMAGE_PER_LEVEL;
+        double spd = 0.25 + golem.getSpeedUpgrade() * SecurityGolemEntity.SPEED_PER_LEVEL;
+        double det = golem.getEffectiveDetectionRadius();
+        g.text(font, String.format("Dmg: %.0f", dmg), x + 8, statusY + 12, C_DIM, false);
+        g.text(font, String.format("Spd: %.2f", spd), x + 60, statusY + 12, C_DIM, false);
+        g.text(font, String.format("Det: %.0f", det), x + 118, statusY + 12, C_DIM, false);
+
+        int lootCap = menu.getLootRows() * 9;
+        g.text(font, "Loot: " + lootCap + " slots", x + 8, statusY + 24, C_DIM, false);
+
+        String mode = SecurityGolemEntity.ThreatMode.fromOrdinal(menu.getData().get(1)).name();
+        g.text(font, "Mode: " + mode, x + 90, statusY + 24, C_DIM, false);
+    }
+
+    // ?????????? LOOT TAB ??????????
+    private void drawLootTab(GuiGraphicsExtractor g, int x, int y) {
+        int totalRows = menu.getLootRows();
+        int visibleRows = Math.min(totalRows, GolemMenu.VISIBLE_LOOT_ROWS);
+
+        for (int row = 0; row < visibleRows; row++) {
             for (int col = 0; col < 9; col++) {
-                drawSlot(graphics, x + 7 + col * 18, lootSlotY + row * 18);
+                g.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_SPRITE,
+                    x + GolemMenu.LOOT_X - 1 + col * 18,
+                    y + GolemMenu.LOOT_Y - 1 + row * 18, 18, 18);
             }
         }
 
-        // === Player inventory section ===
-        int invLabelY = lootSlotY + lootRows * 18;
-        graphics.fill(x + 2, invLabelY, x + w - 2, invLabelY + 1, SEPARATOR);
-        graphics.text(font, "Inventory", x + 8, invLabelY + 2, LABEL_SECTION, false);
+        int scrollOff = menu.getScrollOffset();
+        String rowInfo = "Rows " + (scrollOff + 1) + "-" + (scrollOff + visibleRows) + " of " + totalRows;
+        if (totalRows <= visibleRows) rowInfo = totalRows + " row" + (totalRows == 1 ? "" : "s");
+        g.text(font, rowInfo, x + 8, y + GolemMenu.LOOT_Y + visibleRows * 18 + 2, C_DIM, false);
 
-        int invSlotY = invLabelY + INV_LABEL_H + INV_GAP;
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                drawSlot(graphics, x + 7 + col * 18, invSlotY + row * 18);
-            }
-        }
-
-        // Hotbar
-        int hotbarY = invSlotY + 54 + HOTBAR_GAP;
-        graphics.fill(x + 2, hotbarY - 2, x + w - 2, hotbarY - 1, SEPARATOR);
-        for (int col = 0; col < 9; col++) {
-            drawSlot(graphics, x + 7 + col * 18, hotbarY);
+        if (totalRows > GolemMenu.VISIBLE_LOOT_ROWS) {
+            drawScrollBar(g, x, y, totalRows, visibleRows, scrollOff);
         }
     }
 
-    private void drawSlot(GuiGraphicsExtractor graphics, int sx, int sy) {
-        graphics.fill(sx, sy, sx + 18, sy + 1, SLOT_DARK);
-        graphics.fill(sx, sy, sx + 1, sy + 18, SLOT_DARK);
-        graphics.fill(sx + 1, sy + 17, sx + 18, sy + 18, SLOT_LIGHT);
-        graphics.fill(sx + 17, sy + 1, sx + 18, sy + 18, SLOT_LIGHT);
-        graphics.fill(sx + 1, sy + 1, sx + 17, sy + 17, SLOT_BG);
+    private void drawScrollBar(GuiGraphicsExtractor g, int x, int y,
+                                int totalRows, int visibleRows, int scrollOff) {
+        int trackX = x + GolemMenu.LOOT_X + 9 * 18 + 2;
+        int trackY = y + GolemMenu.LOOT_Y;
+        int trackH = visibleRows * 18;
+
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLER_BG_SPRITE,
+            trackX, trackY, SCROLLER_W, trackH);
+
+        int maxScroll = menu.getMaxScroll();
+        int thumbH = Math.max(10, trackH * visibleRows / totalRows);
+        int thumbRange = trackH - thumbH;
+        int thumbY = trackY + (maxScroll > 0 ? thumbRange * scrollOff / maxScroll : 0);
+
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, SCROLLER_SPRITE,
+            trackX, thumbY, SCROLLER_W, thumbH);
+    }
+
+    // ---------- LISTS TAB ----------
+    private static final int LIST_ENTRY_H = 12;
+    private static final int LIST_START_Y = 20;
+    private static final int LIST_X = 10;
+    private static final int PICKER_MAX_VISIBLE = 6;
+
+    private record PickerEntry(String name) {}
+
+    @Override
+    public void containerTick() {
+        super.containerTick();
+        if (menu.getCurrentTab() == GolemMenu.TAB_LISTS) {
+            // Detect list changes from server sync
+            SecurityGolemEntity golem = menu.getGolem();
+            int ig = golem.getIgnoreListNames().size();
+            int at = golem.getAlwaysAttackListNames().size();
+            if (ig != lastIgnoreSize || at != lastAttackSize) {
+                lastIgnoreSize = ig;
+                lastAttackSize = at;
+                listButtonsDirty = true;
+            }
+            refreshPickerEntries();
+            if (listButtonsDirty) {
+                rebuildListButtons();
+            }
+        }
+    }
+
+    private void clearListButtons() {
+        for (Button b : listButtons) removeWidget(b);
+        listButtons.clear();
+    }
+
+    private void rebuildListButtons() {
+        clearListButtons();
+        SecurityGolemEntity golem = menu.getGolem();
+        Set<String> ignoreNames = golem.getIgnoreListNames();
+        Set<String> attackNames = golem.getAlwaysAttackListNames();
+        int x = leftPos;
+        int btnH = LIST_ENTRY_H;
+
+        // [x] remove from ignore list
+        int curY = topPos + LIST_START_Y + LIST_ENTRY_H;
+        int ri = 0;
+        for (String name : ignoreNames) {
+            final int idx = ri++;
+            Button b = Button.builder(Component.literal("\u00a7cx"), btn -> { clickButton(300 + idx); listButtonsDirty = true; })
+                .bounds(x + W - 22, curY, 14, btnH).build();
+            listButtons.add(addRenderableWidget(b));
+            curY += LIST_ENTRY_H;
+        }
+        if (ignoreNames.isEmpty()) curY += LIST_ENTRY_H;
+
+        curY += 4 + LIST_ENTRY_H; // gap + Deny label
+        int ai = 0;
+        for (String name : attackNames) {
+            final int idx = ai++;
+            Button b = Button.builder(Component.literal("\u00a7cx"), btn -> { clickButton(400 + idx); listButtonsDirty = true; })
+                .bounds(x + W - 22, curY, 14, btnH).build();
+            listButtons.add(addRenderableWidget(b));
+            curY += LIST_ENTRY_H;
+        }
+        if (attackNames.isEmpty()) curY += LIST_ENTRY_H;
+
+        // Picker [A]/[D]
+        curY += 4 + 2 + LIST_ENTRY_H; // gap + separator + Entities label
+        int vis = getPickerVisibleCount(curY);
+        for (int i = 0; i < vis; i++) {
+            int idx = pickerScroll + i;
+            if (idx >= pickerEntries.size()) break;
+            int ey = curY + i * LIST_ENTRY_H;
+            final int fIdx = idx;
+            Button aBtn = Button.builder(Component.literal("\u00a7aA"), btn -> { clickButton(500 + fIdx); listButtonsDirty = true; })
+                .bounds(x + W - 36, ey, 14, btnH).build();
+            Button dBtn = Button.builder(Component.literal("\u00a7cD"), btn -> { clickButton(600 + fIdx); listButtonsDirty = true; })
+                .bounds(x + W - 18, ey, 14, btnH).build();
+            listButtons.add(addRenderableWidget(aBtn));
+            listButtons.add(addRenderableWidget(dBtn));
+        }
+        listButtonsDirty = false;
+    }
+
+    private void refreshPickerEntries() {
+        if (minecraft == null || minecraft.level == null) { pickerEntries = List.of(); return; }
+        SecurityGolemEntity golem = menu.getGolem();
+        Set<String> existing = new LinkedHashSet<>();
+        existing.addAll(golem.getIgnoreListNames());
+        existing.addAll(golem.getAlwaysAttackListNames());
+
+        Set<String> seen = new LinkedHashSet<>();
+        List<PickerEntry> entries = new ArrayList<>();
+
+        // All online players
+        if (minecraft.getConnection() != null) {
+            for (PlayerInfo info : minecraft.getConnection().getOnlinePlayers()) {
+                String name = info.getProfile().name();
+                if (!existing.contains(name) && seen.add(name)) {
+                    entries.add(new PickerEntry(name));
+                }
+            }
+        }
+
+        // All living entities in loaded chunks
+        for (var e : minecraft.level.entitiesForRendering()) {
+            if (e instanceof LivingEntity le && le.isAlive() && le != golem && !(le instanceof Player)) {
+                String name = le.getName().getString();
+                if (!existing.contains(name) && seen.add(name)) {
+                    entries.add(new PickerEntry(name));
+                }
+            }
+        }
+        pickerEntries = entries;
+    }
+
+    private int getPickerVisibleCount(int pickerStartY) {
+        int available = (topPos + menu.getPlayerInvY() - 22 - pickerStartY) / LIST_ENTRY_H;
+        return Math.max(1, Math.min(available, PICKER_MAX_VISIBLE));
+    }
+
+    private int calcPickerStartY(int y) {
+        SecurityGolemEntity golem = menu.getGolem();
+        int h = LIST_START_Y;
+        h += LIST_ENTRY_H; // Allow label
+        h += Math.max(1, golem.getIgnoreListNames().size()) * LIST_ENTRY_H;
+        h += 4;
+        h += LIST_ENTRY_H; // Deny label
+        h += Math.max(1, golem.getAlwaysAttackListNames().size()) * LIST_ENTRY_H;
+        h += 4 + 2 + LIST_ENTRY_H; // gap + separator + Entities label
+        return y + h;
+    }
+
+    private void drawListsTab(GuiGraphicsExtractor g, int x, int y) {
+        refreshPickerEntries();
+        SecurityGolemEntity golem = menu.getGolem();
+        Set<String> ignoreNames = golem.getIgnoreListNames();
+        Set<String> attackNames = golem.getAlwaysAttackListNames();
+
+        // Allow section
+        int curY = y + LIST_START_Y;
+        g.text(font, "\u00a7aAllow:", x + LIST_X, curY, 0xFF55FF55, false);
+        curY += LIST_ENTRY_H;
+        if (ignoreNames.isEmpty()) {
+            g.text(font, "\u00a77(empty)", x + LIST_X + 4, curY, C_DIM, false);
+            curY += LIST_ENTRY_H;
+        } else {
+            for (String name : ignoreNames) {
+                g.text(font, "\u00a7a\u25CF " + name, x + LIST_X + 2, curY, 0xFF55FF55, false);
+                g.text(font, "\u00a77[\u00a7cx\u00a77]", x + W - 24, curY, 0xFFAAAAAA, false);
+                curY += LIST_ENTRY_H;
+            }
+        }
+
+        curY += 4;
+        // Deny section
+        g.text(font, "\u00a7cDeny:", x + LIST_X, curY, 0xFFFF5555, false);
+        curY += LIST_ENTRY_H;
+        if (attackNames.isEmpty()) {
+            g.text(font, "\u00a77(empty)", x + LIST_X + 4, curY, C_DIM, false);
+            curY += LIST_ENTRY_H;
+        } else {
+            for (String name : attackNames) {
+                g.text(font, "\u00a7c\u25CF " + name, x + LIST_X + 2, curY, 0xFFFF5555, false);
+                g.text(font, "\u00a77[\u00a7cx\u00a77]", x + W - 24, curY, 0xFFAAAAAA, false);
+                curY += LIST_ENTRY_H;
+            }
+        }
+
+        // Nearby entities picker
+        curY += 4;
+        g.fill(x + 7, curY, x + W - 7, curY + 1, C_SEP);
+        curY += 2;
+        g.text(font, "\u00a7fEntities:", x + LIST_X, curY, 0xFFFFFFFF, false);
+        curY += LIST_ENTRY_H;
+
+        if (pickerEntries.isEmpty()) {
+            g.text(font, "\u00a77(none)", x + LIST_X + 4, curY, C_DIM, false);
+        } else {
+            int visible = getPickerVisibleCount(curY);
+            for (int i = 0; i < visible; i++) {
+                int idx = pickerScroll + i;
+                if (idx >= pickerEntries.size()) break;
+                PickerEntry pe = pickerEntries.get(idx);
+                g.text(font, "\u00a7f" + pe.name(), x + LIST_X + 2, curY, 0xFFFFFFFF, false);
+                g.text(font, "\u00a7a[A]", x + W - 36, curY, 0xFF55FF55, false);
+                g.text(font, "\u00a7c[D]", x + W - 18, curY, 0xFFFF5555, false);
+                curY += LIST_ENTRY_H;
+            }
+            if (pickerEntries.size() > visible) {
+                g.text(font, "\u00a78\u2191\u2193 scroll", x + LIST_X, curY, C_DIM, false);
+            }
+        }
+    }
+
+    // ---------- PLAYER INVENTORY (both tabs) ----------
+    private void drawPlayerInv(GuiGraphicsExtractor g, int x, int y) {
+        int pInvY = menu.getPlayerInvY();
+
+        int sepY = y + pInvY - 12;
+        g.fill(x + 7, sepY, x + W - 7, sepY + 1, C_SEP);
+        g.text(font, "Inventory", x + 8, sepY + 3, C_DIM, false);
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                g.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_SPRITE,
+                    x + GolemMenu.PLAYER_INV_X - 1 + col * 18,
+                    y + pInvY - 1 + row * 18, 18, 18);
+            }
+        }
+
+        int hotbarY = pInvY + 58;
+        for (int col = 0; col < 9; col++) {
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, SLOT_SPRITE,
+                x + GolemMenu.PLAYER_INV_X - 1 + col * 18,
+                y + hotbarY - 1, 18, 18);
+        }
     }
 
     @Override
-    protected void extractLabels(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-        graphics.text(this.font, this.title, this.titleLabelX + 2, 5, LABEL_TITLE, false);
+    protected void extractLabels(GuiGraphicsExtractor g, int mx, int my) {
+        // handled in extractContents per-tab
     }
 
     private Component getPatrolText() {
         boolean on = menu.getData().get(0) != 0;
-        return Component.literal("Patrol: " + (on ? "\u00a7aON" : "\u00a7cOFF"));
+        return Component.literal(on ? "\u00a72Patrol" : "\u00a74Patrol");
     }
 
     private Component getThreatText() {
         int mode = menu.getData().get(1);
         String name = SecurityGolemEntity.ThreatMode.fromOrdinal(mode).name();
-        return Component.literal("Mode: \u00a7e" + name);
+        return Component.literal(name);
     }
 
-    private Component getCameraText() {
-        boolean on = menu.getData().get(2) != 0;
-        return Component.literal("Camera: " + (on ? "\u00a7aON" : "\u00a77OFF"));
     }
-}
