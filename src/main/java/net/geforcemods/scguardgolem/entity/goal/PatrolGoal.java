@@ -35,6 +35,26 @@ public class PatrolGoal extends Goal {
 
     @Override
     public void tick() {
+        // If recalling, navigate to first waypoint only
+        if (golem.isRecalling()) {
+            BlockPos firstWp = golem.getWaypoints().get(0);
+            double distSq = golem.blockPosition().distSqr(firstWp);
+            if (distSq <= WAYPOINT_REACH_DIST_SQ) {
+                golem.finishRecall();
+                pathStarted = false;
+                return;
+            }
+            if (recalcCooldown > 0) { recalcCooldown--; return; }
+            if (!pathStarted || golem.getNavigation().isDone()) {
+                boolean success = golem.getNavigation().moveTo(
+                        firstWp.getX() + 0.5, firstWp.getY(), firstWp.getZ() + 0.5,
+                        golem.getPatrolSpeed());
+                pathStarted = true;
+                if (!success) recalcCooldown = RECALC_COOLDOWN_TICKS;
+            }
+            return;
+        }
+
         BlockPos target = golem.getCurrentWaypoint();
         if (target == null) return;
 
