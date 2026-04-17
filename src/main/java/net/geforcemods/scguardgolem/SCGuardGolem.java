@@ -9,10 +9,9 @@ import net.geforcemods.securitycraft.items.WireCuttersItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.BellBlock;
@@ -41,7 +40,7 @@ public class SCGuardGolem {
     public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
-        LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 26.1)");
+        LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.21.8)");
     }
 
     @SubscribeEvent
@@ -63,12 +62,15 @@ public class SCGuardGolem {
 
         // Wire Cutters on a Security Golem → open configuration GUI
         if (event.getTarget() instanceof SecurityGolemEntity golem && isWireCutters(held)) {
-            if (golem.isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (golem.isOwner(player) || player.hasPermissions(2)) {
                 if (player instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.openMenu(golem);
+                    serverPlayer.openMenu(golem, buf -> {
+                        buf.writeInt(golem.getId());
+                        buf.writeInt(golem.getLootRows());
+                    });
                 }
             } else {
-                player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
+                player.displayClientMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."), false);
             }
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
@@ -85,8 +87,9 @@ public class SCGuardGolem {
                 .create(serverLevel, EntitySpawnReason.CONVERSION);
         if (golem == null) return;
 
-        golem.snapTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
-                ironGolem.getYRot(), ironGolem.getXRot());
+        golem.setPos(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ());
+        golem.setYRot(ironGolem.getYRot());
+        golem.setXRot(ironGolem.getXRot());
         golem.setHealth(ironGolem.getHealth());
         golem.setPlayerCreated(ironGolem.isPlayerCreated());
         golem.setGolemOwner(player);
@@ -95,8 +98,8 @@ public class SCGuardGolem {
         serverLevel.addFreshEntity(golem);
 
         held.shrink(1);
-        player.sendSystemMessage(
-                Component.translatable("scguardgolem.conversion.success"));
+        player.displayClientMessage(
+                Component.translatable("scguardgolem.conversion.success"), false);
 
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
@@ -118,7 +121,7 @@ public class SCGuardGolem {
                 g -> g.isOwner(player) && !g.getWaypoints().isEmpty());
         if (!golems.isEmpty()) {
             for (SecurityGolemEntity golem : golems) golem.recallToStart();
-            player.sendSystemMessage(Component.literal("\u00a76[Security Golem] \u00a7f" + golems.size() + " golem(s) recalled."));
+            player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7f" + golems.size() + " golem(s) recalled."), false);
         }
     }
 
@@ -139,7 +142,7 @@ public class SCGuardGolem {
         List<SecurityGolemEntity> golems = serverLevel.getEntitiesOfClass(SecurityGolemEntity.class, searchBox,
                 g -> g.isOwner(player));
         if (golems.isEmpty()) {
-            player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] No nearby golem found."));
+            player.displayClientMessage(Component.literal("\u00a7c[Security Golem] No nearby golem found."), false);
             return;
         }
         SecurityGolemEntity nearest = golems.stream()
@@ -147,8 +150,8 @@ public class SCGuardGolem {
                 .orElse(null);
         if (nearest != null) {
             nearest.addWaypoint(event.getPos());
-            player.sendSystemMessage(Component.literal("\u00a76[Security Golem] \u00a7fWaypoint #"
-                    + (nearest.getWaypoints().size() - 1) + " added at " + event.getPos().toShortString() + "."));
+            player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7fWaypoint #"
+                    + (nearest.getWaypoints().size() - 1) + " added at " + event.getPos().toShortString() + "."), false);
             event.setCanceled(true);
         }
     }

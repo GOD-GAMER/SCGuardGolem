@@ -36,7 +36,7 @@ import net.minecraft.world.entity.ai.goal.MoveTowardsTargetGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
-import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Enemy;
@@ -44,7 +44,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -98,7 +97,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     private double patrolSpeed = 1.0;
 
     // Name-based allow/deny lists
-    public static final int MAX_LIST_ENTRIES = 8;
+    public static final int MAX_LIST_ENTRIES = 64;
     private final TreeSet<String> ignoreList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
     private final TreeSet<String> attackList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
@@ -147,7 +146,12 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         this.targetSelector.addGoal(2, new PlayerThreatGoal(this));
         this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
                 net.minecraft.world.entity.Mob.class, 5, false, false,
-                (entity, level) -> entity instanceof Enemy && !(entity instanceof Creeper)));
+                (entity, serverLevel) -> {
+                    String name = entity.getName().getString();
+                    if (isOnIgnoreList(name)) return false;
+                    if (isOnAlwaysAttackList(name)) return true;
+                    return entity instanceof Enemy && !(entity instanceof Creeper);
+                }));
     }
 
     @Override
@@ -175,21 +179,18 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     }
 
     @Override
-    public void writeClientSideData(AbstractContainerMenu menu, net.minecraft.network.RegistryFriendlyByteBuf buf) {
-        buf.writeInt(this.getId());
-        buf.writeInt(getLootRows());
-    }
-
-    @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
-            if (isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (isOwner(player) || player.hasPermissions(2)) {
                 if (player instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.openMenu(this);
+                    serverPlayer.openMenu(this, buf -> {
+                        buf.writeInt(this.getId());
+                        buf.writeInt(this.getLootRows());
+                    });
                 }
                 return InteractionResult.SUCCESS;
             } else {
-                player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
+                player.displayClientMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."), false);
             }
         }
         return InteractionResult.PASS;
@@ -197,14 +198,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
     // -- Owner --
     public void setGolemOwner(Player player) {
-        entityData.set(OWNER_UUID, player.getGameProfile().id().toString());
+        entityData.set(OWNER_UUID, player.getGameProfile().getId().toString());
         entityData.set(OWNER_NAME, player.getName().getString());
     }
     public String getOwnerUUID() { return entityData.get(OWNER_UUID); }
     public String getOwnerName() { return entityData.get(OWNER_NAME); }
     public boolean isOwner(Player player) {
         String uuid = getOwnerUUID();
-        return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
+        return !uuid.isEmpty() && uuid.equals(player.getGameProfile().getId().toString());
     }
 
     // -- Module Inventory --

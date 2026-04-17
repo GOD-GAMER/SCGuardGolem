@@ -7,11 +7,11 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.animal.IronGolem;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -45,7 +45,7 @@ public class SCGContent {
                             .setUpdateInterval(3)
                             .setShouldReceiveVelocityUpdates(true)
                             .build(ResourceKey.create(Registries.ENTITY_TYPE,
-                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
+                                    ResourceLocation.fromNamespaceAndPath(SCGuardGolem.MODID, "security_golem"))));
 
     public static final DeferredHolder<MenuType<?>, MenuType<GolemMenu>> GOLEM_MENU =
             MENU_TYPES.register("golem_menu", () ->
@@ -53,7 +53,7 @@ public class SCGContent {
 
     public static final DeferredItem<SCGManualItem> SCG_MANUAL =
             ITEMS.registerItem("scg_manual", SCGManualItem::new,
-                    p -> p.stacksTo(1)
+                    new net.minecraft.world.item.Item.Properties().stacksTo(1)
                             .component(DataComponents.WRITTEN_BOOK_CONTENT,
                                     SCGManualItem.buildManualContent()));
 

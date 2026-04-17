@@ -37,7 +37,7 @@ public class SCGManualItem extends Item {
         Style highlight = Style.EMPTY.withColor(ChatFormatting.GOLD);
 
         List<Filterable<Component>> pages = List.of(
-                // Page 1 — Title
+                // Page 1 -- Title
                 page(Component.empty()
                         .append(Component.literal("\n\n").withStyle(body))
                         .append(Component.literal("Security Guard\nGolem Manual").withStyle(header))
@@ -45,14 +45,14 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("v1.2 \u2014 Module &\nGUI Update").withStyle(highlight))
                         .append(Component.literal("\n\n").withStyle(body))
                         .append(Component.literal("A complete guide\nto your Security\nGolem.").withStyle(dim))),
-                // Page 2 — Getting Started
+                // Page 2 -- Getting Started
                 page(Component.empty()
                         .append(Component.literal("Getting Started\n\n").withStyle(header))
                         .append(Component.literal("1. Build a vanilla\n   Iron Golem\n\n").withStyle(body))
                         .append(Component.literal("2. Hold any SC\n   Keycard\n\n").withStyle(body))
                         .append(Component.literal("3. Right-click the\n   Iron Golem\n\n").withStyle(body))
                         .append(Component.literal("The keycard is\nconsumed and you\nbecome its owner.").withStyle(dim))),
-                // Page 3 — Wire Cutters GUI
+                // Page 3 -- Wire Cutters GUI
                 page(Component.empty()
                         .append(Component.literal("Configuration GUI\n\n").withStyle(header))
                         .append(Component.literal("Use SC ").withStyle(body))
@@ -72,7 +72,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("+4 block detection\nradius per level\n\n").withStyle(dim))
                         .append(Component.literal("Storage Module\n").withStyle(highlight))
                         .append(Component.literal("Enables loot pickup\n+1 row per level").withStyle(dim))),
-                // Page 5 — Allow/Deny Lists
+                // Page 5 -- Allow/Deny Lists
                 page(Component.empty()
                         .append(Component.literal("Allow / Deny Lists\n\n").withStyle(header))
                         .append(Component.literal("Open the ").withStyle(body))
@@ -86,7 +86,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Click the ").withStyle(body))
                         .append(Component.literal("[x]").withStyle(highlight))
                         .append(Component.literal(" beside a\nname to remove it.").withStyle(dim))),
-                // Page 6 — Waypoints
+                // Page 6 -- Waypoints
                 page(Component.empty()
                         .append(Component.literal("Setting Waypoints\n\n").withStyle(header))
                         .append(Component.literal("Hold a ").withStyle(body))
@@ -97,7 +97,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Use the ").withStyle(body))
                         .append(Component.literal("Clear Route").withStyle(highlight))
                         .append(Component.literal("\nbutton in the Config\ntab to delete all\nwaypoints.").withStyle(body))),
-                // Page 7 — Bell Recall
+                // Page 7 -- Bell Recall
                 page(Component.empty()
                         .append(Component.literal("Bell Recall\n\n").withStyle(header))
                         .append(Component.literal("Right-click a ").withStyle(body))
@@ -107,13 +107,13 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Use the ").withStyle(body))
                         .append(Component.literal("Patrol").withStyle(highlight))
                         .append(Component.literal(" button\nin the GUI to\nrestart patrol.").withStyle(body))),
-                // Page 8 — Patrol & Threats
+                // Page 8 -- Patrol & Threats
                 page(Component.empty()
                         .append(Component.literal("Patrol & Threats\n\n").withStyle(header))
                         .append(Component.literal("Toggle patrol and\nthreat mode in the\nGUI or via commands.\n\n").withStyle(body))
                         .append(Component.literal("/scgolem patrol\n  start | stop\n  speed <0.1-3.0>\n\n").withStyle(cmd))
                         .append(Component.literal("/scgolem threat\n  warn|follow|attack").withStyle(cmd))),
-                // Page 9 — Other Commands
+                // Page 9 -- Other Commands
                 page(Component.empty()
                         .append(Component.literal("Other Commands\n\n").withStyle(header))
                         .append(Component.literal("/scgolem status\n").withStyle(cmd))

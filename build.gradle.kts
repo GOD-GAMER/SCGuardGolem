@@ -14,7 +14,7 @@ base {
     version = modVersion
 }
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 
 tasks.processResources {
     exclude(".cache")

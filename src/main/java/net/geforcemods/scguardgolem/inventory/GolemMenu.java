@@ -84,7 +84,7 @@ public class GolemMenu extends AbstractContainerMenu {
         };
         addDataSlots(this.data);
 
-        // ?? Module slots (visible on CONFIG tab) — 2x2 grid ??
+        // ?? Module slots (visible on CONFIG tab) -- 2x2 grid ??
         for (int row = 0; row < 2; row++) {
             for (int col = 0; col < 2; col++) {
                 int index = row * 2 + col;
@@ -136,7 +136,7 @@ public class GolemMenu extends AbstractContainerMenu {
         }
     }
 
-    /** Client-side factory — reads entity ID + lootRows from the network buffer. */
+    /** Client-side factory -- reads entity ID + lootRows from the network buffer. */
     public GolemMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         this(containerId, playerInv, prepareGolemFromBuf(playerInv, buf));
     }

@@ -13,14 +13,14 @@ authors = "SCGuardGolem Team"
 [[dependencies.scguardgolem]]
 modId = "neoforge"
 type = "required"
-versionRange = "[26,)"
+versionRange = "[21.8,)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.scguardgolem]]
 modId = "minecraft"
 type = "required"
-versionRange = "[26.1,)"
+versionRange = "[1.21.8,1.22)"
 ordering = "NONE"
 side = "BOTH"
 
