@@ -1,22 +1,22 @@
-# SecurityCraft Guard Golem Addon - MC 1.21.10
+# SecurityCraft Guard Golem Addon
 
-A SecurityCraft addon that adds a **Security Guard Golem** entity with patrol routes,
-badge-based player detection, configurable combat behavior, upgrades, and player target lists.
+A **SecurityCraft** addon that adds a configurable **Security Guard Golem** with patrol routes, module-based abilities, a 3-tab GUI, loot collection, and player allow/deny lists.
 
 | | |
 |---|---|
 | **Minecraft** | 1.21.10 |
-| **NeoForge** | 21.10.63+ |
+| **Mod Loader** | NeoForge 21.10+ |
 | **SecurityCraft** | 1.10.1+ |
-| **Java** | 21 |
+| **Java** | 21+ |
+| **Mod Version** | 1.3.0 |
 
 ---
 
 ## Installation
 
-1. Install **Minecraft 1.21.10** with **NeoForge 21.10.63** or later
-2. Install **SecurityCraft 1.10.1** or later for MC 1.21.10
-3. Download the JAR from the [Releases](https://github.com/GOD-GAMER/SCGuardGolem/releases) page
+1. Install **Minecraft 1.21.10** with **NeoForge**
+2. Install **SecurityCraft** 1.10.1+
+3. Download the latest JAR from CurseForge or GitHub Releases
 4. Place the JAR in your `.minecraft/mods/` folder
 5. Launch the game
 
@@ -24,85 +24,88 @@ badge-based player detection, configurable combat behavior, upgrades, and player
 
 ## Features
 
-### Security Guard Golem
+### Converting a Golem
 - Right-click any vanilla **Iron Golem** with a **SecurityCraft Keycard** to convert it
-- The keycard is consumed and you become its owner
-- Retains Iron Golem appearance and combat AI but gains new security features
+- The keycard is consumed and you become the golem's owner
+
+### 3-Tab GUI (Wire Cutters)
+Right-click your golem with **SecurityCraft Wire Cutters** to open the configuration screen:
+- **Config Tab** - Toggle patrol, set threat mode (Warn/Follow/Attack), adjust patrol speed
+- **Loot Tab** - Scrollable inventory (up to 6 rows), requires Storage Module
+- **Lists Tab** - Allow list and Deny list with entity picker
+
+### Module Upgrades (4 Slots)
+
+| Module | Effect per Level | Max |
+|---|---|---|
+| **Harming** | +3 attack damage | 5 |
+| **Speed** | +0.03 movement speed | 5 |
+| **Smart** | +4 block detection range | 5 |
+| **Storage** | +1 loot inventory row | 5 |
+| **Allowlist** | Enables allow list | 1 |
+| **Denylist** | Enables deny list | 1 |
+
+Stack count = upgrade level (e.g., 3 Harming modules = level 3).
 
 ### Patrol System
-- Define waypoints for the golem to follow in a loop
-- Adjustable patrol speed (0.1x to 3.0x)
-- Patrols pause automatically when the golem engages a target
+- Define waypoints via commands or reinforced lever placement
+- Golem patrols waypoints in a loop at configurable speed (0.1x - 3.0x)
 
-### Threat Detection
-- **WARN** - Sends chat warning to untrusted players
-- **FOLLOW** - Follows untrusted players without attacking
-- **ATTACK** - Attacks untrusted players on sight
+### Loot Collection
+- With a **Storage Module**, the golem auto-collects dropped items nearby
+- Loot inventory scales with module level (1-6 rows, scrollable)
 
-### Upgrades (0-5 levels each)
-- **Damage** - +3 attack damage per level
-- **Speed** - +0.03 movement speed per level
-- **Detection** - +4 block detection radius per level (base 16 blocks)
+### Bell Recall
+- Ring a **Bell** within 48 blocks to recall all nearby owned golems
 
 ### Player Lists
-- **Ignore list** - Players who are never targeted
-- **Attack list** - Players who are always targeted regardless of trust
+- **Allow list** - Players/entities the golem will never target
+- **Deny list** - Players/entities the golem will always target
 
 ### In-Game Manual
-- Book item with complete usage guide (Creative tab: Security Guard Golem)
+- Craftable book item with a complete usage guide
 
 ---
 
 ## Commands
 
-All commands require operator permissions (level 2) and target the nearest Security Golem within 32 blocks.
+All commands require operator permissions (level 2).
 
 | Command | Description |
 |---|---|
-| `/scgolem status` | Show full status report |
-| `/scgolem setowner` | Claim ownership of nearest golem |
-| `/scgolem patrol start` | Start patrol loop |
-| `/scgolem patrol stop` | Stop patrol |
+| `/scgolem status` | Full status report |
+| `/scgolem setowner` | Claim ownership |
+| `/scgolem patrol start/stop` | Toggle patrol |
 | `/scgolem patrol speed <0.1-3.0>` | Set patrol speed |
-| `/scgolem patrol waypoint addhere` | Add waypoint at your position |
-| `/scgolem patrol waypoint add <x> <y> <z>` | Add waypoint at coordinates |
-| `/scgolem patrol waypoint list` | List all waypoints |
-| `/scgolem patrol waypoint remove <index>` | Remove waypoint by index |
-| `/scgolem patrol waypoint clear` | Clear all waypoints |
-| `/scgolem threat warn` | Set threat mode to WARN |
-| `/scgolem threat follow` | Set threat mode to FOLLOW |
-| `/scgolem threat attack` | Set threat mode to ATTACK |
-| `/scgolem upgrade damage <0-5>` | Set damage upgrade level |
-| `/scgolem upgrade speed <0-5>` | Set speed upgrade level |
-| `/scgolem upgrade detection <0-5>` | Set detection upgrade level |
-| `/scgolem list ignore add <name>` | Add player to ignore list |
-| `/scgolem list ignore remove <name>` | Remove player from ignore list |
-| `/scgolem list attack add <name>` | Add to always-attack list |
-| `/scgolem list attack remove <name>` | Remove from always-attack list |
-| `/scgolem list show` | Show both player lists |
+| `/scgolem patrol waypoint add/addhere/remove/clear/list` | Manage waypoints |
+| `/scgolem threat warn/follow/attack` | Set threat mode |
+
+---
+
+## Supported Versions
+
+| Minecraft | Mod Loader | Branch |
+|---|---|---|
+| **26.1** | NeoForge | `mc/26.1` |
+| **1.21.11** | NeoForge | `mc/1.21.11` |
+| **1.21.10** | NeoForge | `mc/1.21.10` |
+| **1.21.8** | NeoForge | `mc/1.21.8` |
+| **1.21.1** | NeoForge | `mc/1.21.1` |
+| **1.20.4** | NeoForge | `mc/1.20.4` |
+| **1.20.1** | Forge | `mc/1.20.1` |
 
 ---
 
 ## Building from Source
 
-```bash
+```
 git clone -b mc/1.21.10 https://github.com/GOD-GAMER/SCGuardGolem.git
 cd SCGuardGolem
-# Place SecurityCraft JAR in libs/ folder
 ./gradlew build
-# Output: build/libs/SecurityGolemAddon-1.21.10-SC1.10.1-1.0.0.jar
 ```
 
 ---
 
-## Other Versions
-
-| Minecraft | Branch |
-|---|---|
-| **1.21.10** | [`mc/1.21.10`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.21.10) |
-| **1.20.4** | [`mc/1.20.4`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.20.4) |
-| **1.20.1** | [`mc/1.20.1`](https://github.com/GOD-GAMER/SCGuardGolem/tree/mc/1.20.1) |
-
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT License
