@@ -87,7 +87,7 @@ tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge:
     val projectId = (findProperty("curseforgeProjectId") as String?)?.toIntOrNull() ?: 0
     val mainFile = upload(projectId, tasks.jar.get().archiveFile)
     mainFile.releaseType = "release"
-    mainFile.addModLoader("NeoForge")
+    mainFile.addModLoader("Forge")
     mainFile.addGameVersion(mcVersion)
     mainFile.changelog = "See https://github.com/GOD-GAMER/SCGuardGolem/blob/mc/${mcVersion}/CHANGELOG.md"
     mainFile.changelogType = "markdown"
