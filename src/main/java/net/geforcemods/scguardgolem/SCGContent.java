@@ -25,7 +25,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-@EventBusSubscriber(modid = SCGuardGolem.MODID)
+@EventBusSubscriber(modid = SCGuardGolem.MODID, bus = EventBusSubscriber.Bus.MOD)
 public class SCGContent {
 
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
