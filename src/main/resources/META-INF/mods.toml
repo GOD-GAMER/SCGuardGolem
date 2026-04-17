@@ -7,8 +7,7 @@ modId = "scguardgolem"
 version = "${file.jarVersion}"
 displayName = "SecurityCraft Guard Golem"
 description = '''
-A SecurityCraft addon that adds a Security Guard Golem entity with patrol routes,
-badge-based player detection, configurable combat behavior, and player target lists.
+A SecurityCraft addon that adds a configurable Security Guard Golem with patrol routes, module-based upgrades, a 3-tab GUI, scrollable loot collection, and player allow/deny lists.
 '''
 authors = "SCGuardGolem Team"
 
