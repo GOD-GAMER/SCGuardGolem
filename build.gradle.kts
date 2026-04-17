@@ -1,5 +1,5 @@
 plugins {
-    id("net.neoforged.gradle.userdev") version "7.0.163"
+    id("net.minecraftforge.gradle") version "6.0.+"
     id("net.darkhax.curseforgegradle") version "1.1.25"
 }
 
@@ -15,6 +15,35 @@ base {
 }
 
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+
+minecraft {
+    mappings("official", mcVersion)
+
+    runs {
+        create("client") {
+            workingDirectory(project.file("runs/client"))
+            property("forge.logging.markers", "REGISTRIES")
+            property("forge.logging.console.level", "debug")
+            mods {
+                create(modId) {
+                    source(sourceSets.main.get())
+                }
+            }
+        }
+
+        create("server") {
+            workingDirectory(project.file("runs/server"))
+            property("forge.logging.markers", "REGISTRIES")
+            property("forge.logging.console.level", "debug")
+            args("--nogui")
+            mods {
+                create(modId) {
+                    source(sourceSets.main.get())
+                }
+            }
+        }
+    }
+}
 
 tasks.processResources {
     exclude(".cache")
@@ -32,35 +61,19 @@ tasks.jar {
     }
 }
 
-runs {
-    configureEach {
-        modSource(sourceSets.main.get())
-    }
-
-    create("client") {
-        systemProperty("forge.logging.markers", "REGISTRIES")
-        systemProperty("forge.logging.console.level", "debug")
-    }
-
-    create("server") {
-        systemProperty("forge.logging.markers", "REGISTRIES")
-        systemProperty("forge.logging.console.level", "debug")
-        programArgument("--nogui")
-    }
-}
-
 repositories {
+    maven { url = uri("https://maven.minecraftforge.net/") }
     flatDir {
         dirs("libs")
     }
 }
 
 dependencies {
-    implementation("net.neoforged:forge:${forgeVersion}")
+    minecraft("net.minecraftforge:forge:${forgeVersion}")
     compileOnly(fileTree("libs") { include("*.jar") })
 }
 
-// SC jar uses SRG names in mixins, incompatible with MCP dev env
+// SC jar has SRG names baked into mixin bytecode — incompatible with dev env
 // configurations.named("runtimeClasspath") {
 //     extendsFrom(configurations.getByName("compileOnly"))
 // }

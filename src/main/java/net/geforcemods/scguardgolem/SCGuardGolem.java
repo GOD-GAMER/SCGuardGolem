@@ -20,6 +20,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent.LeftClickBlock;
@@ -35,8 +36,9 @@ public class SCGuardGolem {
 
     public static boolean scLoaded;
 
-    public SCGuardGolem(IEventBus modBus) {
+    public SCGuardGolem() {
         scLoaded = ModList.get().isLoaded("securitycraft");
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         SCGContent.register(modBus);
         LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.20.1)");
     }
