@@ -1,3 +1,5 @@
+modLoader = "javafml"
+loaderVersion = "[2,)"
 license = "MIT"
 
 [[mods]]
@@ -13,20 +15,20 @@ authors = "SCGuardGolem Team"
 [[dependencies.scguardgolem]]
 modId = "neoforge"
 type = "required"
-versionRange = "[26,)"
+versionRange = "[20.4,)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.scguardgolem]]
 modId = "minecraft"
 type = "required"
-versionRange = "[26.1,)"
+versionRange = "[1.20.4,1.21)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.scguardgolem]]
 modId = "securitycraft"
 type = "required"
-versionRange = "[1.10.0,)"
+versionRange = "[1.9.0,)"
 ordering = "AFTER"
 side = "BOTH"

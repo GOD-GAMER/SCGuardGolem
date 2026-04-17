@@ -1,0 +1,10 @@
+> Task :createMinecraftArtifacts UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+
+> Task :downloadAssets
+Loaded 141 artifacts from C:\Users\cabca\Desktop\addon\build\tmp\downloadAssets\nfrt_artifact_manifest.properties
+Downloading asset index 12
+Using Minecraft asset root: C:\Users\cabca\.gradle\caches\neoformruntime\assets
+  DL    https://piston-meta.mojang.com/v1/packages/f687d6dd8683c3136314f98fbc2f0bdda143c032/12.json
