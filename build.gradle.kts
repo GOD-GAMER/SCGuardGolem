@@ -1,11 +1,11 @@
 plugins {
-    id("net.neoforged.moddev") version "2.0.134"
+    id("net.neoforged.gradle.userdev") version "7.0.163"
     id("net.darkhax.curseforgegradle") version "1.1.25"
 }
 
 val modId = "scguardgolem"
 val mcVersion: String by project
-val neoforgeVersion: String by project
+val forgeVersion: String by project
 val scVersion: String by project
 val modVersion: String by project
 
@@ -14,7 +14,7 @@ base {
     version = modVersion
 }
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 
 tasks.processResources {
     exclude(".cache")
@@ -32,29 +32,20 @@ tasks.jar {
     }
 }
 
-neoForge {
-    version = neoforgeVersion
-
-    runs {
-        configureEach {
-            logLevel = org.slf4j.event.Level.DEBUG
-            gameDirectory = file("run/" + name)
-        }
-
-        register("client") {
-            client()
-        }
-
-        register("server") {
-            server()
-            programArgument("-nogui")
-        }
+runs {
+    configureEach {
+        modSource(sourceSets.main.get())
     }
 
-    mods {
-        create(modId) {
-            sourceSet(sourceSets.main.get())
-        }
+    create("client") {
+        systemProperty("forge.logging.markers", "REGISTRIES")
+        systemProperty("forge.logging.console.level", "debug")
+    }
+
+    create("server") {
+        systemProperty("forge.logging.markers", "REGISTRIES")
+        systemProperty("forge.logging.console.level", "debug")
+        programArgument("--nogui")
     }
 }
 
@@ -65,13 +56,14 @@ repositories {
 }
 
 dependencies {
+    implementation("net.neoforged:forge:${forgeVersion}")
     compileOnly(fileTree("libs") { include("*.jar") })
 }
 
-// Add SC jar to dev runtime so runClient can find it
-configurations.named("runtimeClasspath") {
-    extendsFrom(configurations.getByName("compileOnly"))
-}
+// SC jar uses SRG names in mixins, incompatible with MCP dev env
+// configurations.named("runtimeClasspath") {
+//     extendsFrom(configurations.getByName("compileOnly"))
+// }
 
 tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge::class) {
     dependsOn(tasks.jar)
