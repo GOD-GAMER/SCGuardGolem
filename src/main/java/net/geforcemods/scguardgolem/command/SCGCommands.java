@@ -9,7 +9,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity.ThreatMode;
 import net.minecraft.commands.CommandSourceStack;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -24,7 +23,7 @@ public class SCGCommands {
     private static final double SEARCH_RANGE = 32.0;
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("scgolem").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+        dispatcher.register(Commands.literal("scgolem").requires(src -> src.hasPermission(2))
                 .then(Commands.literal("patrol")
                         .then(Commands.literal("start").executes(SCGCommands::patrolStart))
                         .then(Commands.literal("stop").executes(SCGCommands::patrolStop))
@@ -179,7 +178,6 @@ public class SCGCommands {
         msg(ctx, "Threat Mode: \u00a7e" + g.getThreatMode().name());
         msg(ctx, "Detection Radius: \u00a7e" + String.format("%.1f", g.getEffectiveDetectionRadius()) + " blocks");
         msg(ctx, "Modules \u2014 DMG:\u00a7e" + g.getDamageUpgrade() + "\u00a7f SPD:\u00a7e" + g.getSpeedUpgrade() + "\u00a7f DET:\u00a7e" + g.getDetectionUpgrade());
-        msg(ctx, "Camera: " + (g.hasCamera() ? "\u00a7aInstalled" : "\u00a77None"));
         Set<String> ignore = g.getIgnoreListNames();
         Set<String> attack = g.getAlwaysAttackListNames();
         msg(ctx, "Ignore: \u00a77" + (ignore.isEmpty() ? "(empty)" : String.join(", ", ignore)));

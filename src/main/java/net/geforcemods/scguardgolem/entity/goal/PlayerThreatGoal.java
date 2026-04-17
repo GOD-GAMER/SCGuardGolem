@@ -28,10 +28,11 @@ public class PlayerThreatGoal extends TargetGoal {
     @Override
     public boolean canUse() {
         if (golem.getThreatMode() == ThreatMode.WARN) return false;
-        if (!golem.isScanTick()) return false;
+        if (!golem.isScanTick()) return targetPlayer != null;
         LivingEntity current = golem.getTarget();
         if (current instanceof Player player && player.isAlive()
-                && !player.isSpectator() && !player.isCreative()) {
+                && !player.isSpectator() && !player.isCreative()
+                && golem.isOnAlwaysAttackList(player.getName().getString())) {
             targetPlayer = player;
             return true;
         }
@@ -46,7 +47,10 @@ public class PlayerThreatGoal extends TargetGoal {
         double maxDist = golem.getEffectiveDetectionRadius() * 1.5;
         if (golem.distanceToSqr(targetPlayer) > maxDist * maxDist) return false;
         String name = targetPlayer.getName().getString();
-        return !golem.isOnIgnoreList(name) && !golem.isOwner(targetPlayer);
+        if (golem.isOnIgnoreList(name)) return false;
+        // Attack list overrides owner protection
+        if (golem.isOnAlwaysAttackList(name)) return true;
+        return !golem.isOwner(targetPlayer);
     }
 
     @Override
