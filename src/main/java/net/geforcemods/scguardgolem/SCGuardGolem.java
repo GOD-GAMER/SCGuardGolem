@@ -1,10 +1,12 @@
 package net.geforcemods.scguardgolem;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
-import net.geforcemods.scguardgolem.network.AddWaypointPayload;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.geforcemods.securitycraft.items.WireCuttersItem;
 import net.minecraft.core.BlockPos;
@@ -26,8 +28,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
-import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -40,43 +41,16 @@ public class SCGuardGolem {
 
     public static boolean scLoaded;
 
+    // --- Double-crouch state (server-side, per player) ---
+    private static final Map<UUID, Long> firstCrouchTick = new HashMap<>();
+    private static final Map<UUID, Boolean> wasCrouching = new HashMap<>();
+    /** Ticks within which a second crouch counts as a double-crouch (~1.5 s). */
+    private static final int DOUBLE_CROUCH_WINDOW = 30;
+
     public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
-        modBus.addListener(SCGuardGolem::onRegisterPayloads);
         LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.21.8)");
-    }
-
-    private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
-        registrar.playToServer(
-                AddWaypointPayload.TYPE,
-                AddWaypointPayload.STREAM_CODEC,
-                (payload, ctx) -> ctx.enqueueWork(() -> {
-                    ServerPlayer sender = (ServerPlayer) ctx.player();
-                    if (sender == null) return;
-                    ServerLevel level = (ServerLevel) sender.level();
-                    BlockPos playerPos = sender.blockPosition();
-                    AABB box = new AABB(playerPos).inflate(32);
-                    List<SecurityGolemEntity> golems = level.getEntitiesOfClass(
-                            SecurityGolemEntity.class, box, g -> g.isOwner(sender));
-                    if (golems.isEmpty()) {
-                        sender.displayClientMessage(
-                                Component.literal("\u00a7c[Security Golem] No nearby golem found."), false);
-                        return;
-                    }
-                    SecurityGolemEntity nearest = golems.stream()
-                            .min((a, b) -> Double.compare(a.distanceToSqr(sender), b.distanceToSqr(sender)))
-                            .orElse(null);
-                    if (nearest != null) {
-                        nearest.addWaypoint(playerPos);
-                        sender.displayClientMessage(Component.literal(
-                                "\u00a76[Security Golem] \u00a7fWaypoint #"
-                                + (nearest.getWaypoints().size() - 1)
-                                + " added at " + playerPos.toShortString() + "."), false);
-                    }
-                })
-        );
     }
 
     @SubscribeEvent
@@ -106,7 +80,7 @@ public class SCGuardGolem {
                         buf.writeInt(golem.getDwellTicks());
                         buf.writeInt(golem.getWaypoints().size());
                         for (int wi = 0; wi < golem.getWaypoints().size(); wi++) {
-                            net.minecraft.core.BlockPos wp = golem.getWaypoints().get(wi);
+                            BlockPos wp = golem.getWaypoints().get(wi);
                             buf.writeInt(wp.getX());
                             buf.writeInt(wp.getY());
                             buf.writeInt(wp.getZ());
@@ -169,6 +143,60 @@ public class SCGuardGolem {
             for (SecurityGolemEntity golem : golems) golem.recallToStart();
             player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7f" + golems.size() + " golem(s) recalled."), false);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    //  Player tick: double-crouch with wire cutters → place waypoint
+    // -----------------------------------------------------------------------
+    @SubscribeEvent
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
+        Player player = event.getEntity();
+        if (!(player.level() instanceof ServerLevel serverLevel)) return;
+
+        UUID uid = player.getUUID();
+        boolean hasWireCutters = isWireCutters(player.getMainHandItem())
+                || isWireCutters(player.getOffhandItem());
+
+        if (!hasWireCutters) {
+            wasCrouching.remove(uid);
+            firstCrouchTick.remove(uid);
+            return;
+        }
+
+        boolean crouching = player.isCrouching();
+        boolean was = wasCrouching.getOrDefault(uid, false);
+
+        if (crouching && !was) {
+            long now = serverLevel.getGameTime();
+            Long first = firstCrouchTick.get(uid);
+            if (first == null || (now - first) > DOUBLE_CROUCH_WINDOW) {
+                firstCrouchTick.put(uid, now);
+            } else {
+                firstCrouchTick.remove(uid);
+                placeWaypoint(player, serverLevel);
+            }
+        }
+        wasCrouching.put(uid, crouching);
+    }
+
+    private static void placeWaypoint(Player player, ServerLevel level) {
+        BlockPos pos = player.blockPosition();
+        AABB searchBox = new AABB(pos).inflate(64);
+        List<SecurityGolemEntity> owned = level.getEntitiesOfClass(
+                SecurityGolemEntity.class, searchBox, g -> g.isOwner(player));
+        if (owned.isEmpty()) {
+            player.displayClientMessage(
+                    Component.literal("\u00a7c[Security Golem] No owned golem within 64 blocks."), false);
+            return;
+        }
+        // Place on the closest owned golem
+        SecurityGolemEntity golem = owned.stream()
+                .min(java.util.Comparator.comparingDouble(g -> g.distanceToSqr(pos.getX(), pos.getY(), pos.getZ())))
+                .orElse(owned.get(0));
+        golem.addWaypoint(pos);
+        player.displayClientMessage(Component.literal(
+                "\u00a76[Security Golem] \u00a7fWaypoint #" + (golem.getWaypoints().size() - 1)
+                + " added at " + pos.toShortString() + "."), false);
     }
 
     public static boolean isReinforcedLever(ItemStack stack) {
