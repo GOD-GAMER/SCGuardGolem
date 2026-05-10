@@ -11,8 +11,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -106,6 +108,8 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             denyScroll = 0;
             refreshPickerEntries();
             listButtonsDirty = true;
+        } else if (tab == GolemMenu.TAB_WAYPOINTS) {
+            listButtonsDirty = true;
         }
         clickButton(200 + tab);
     }
@@ -119,23 +123,24 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
-            int tabW = W / 3;
+            int tabW = W / 4;
             int tabY = topPos - TAB_H;
             if (mouseY >= tabY && mouseY < topPos) {
-                if (mouseX >= leftPos && mouseX < leftPos + tabW) {
-                    switchTab(GolemMenu.TAB_CONFIG);
-                    return true;
-                } else if (mouseX >= leftPos + tabW && mouseX < leftPos + tabW * 2) {
-                    switchTab(GolemMenu.TAB_LOOT);
-                    return true;
-                } else if (mouseX >= leftPos + tabW * 2 && mouseX < leftPos + W) {
-                    switchTab(GolemMenu.TAB_LISTS);
-                    return true;
+                for (int i = 0; i < 4; i++) {
+                    int tx = x(i, tabW);
+                    int tw = tabWidth(i, tabW);
+                    if (mouseX >= tx && mouseX < tx + tw) {
+                        switchTab(i);
+                        return true;
+                    }
                 }
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
+
+    private int x(int i, int tabW) { return leftPos + i * tabW; }
+    private int tabWidth(int i, int tabW) { return (i == 3) ? W - tabW * 3 : tabW; }
 
     // ?? Scroll support ??
     @Override
@@ -198,15 +203,15 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     protected void renderBg(GuiGraphics g, float pt, int mx, int my) {
         int x = leftPos;
         int y = topPos;
-        int tabW = W / 3;
         int tabY = y - TAB_H;
         int curTab = menu.getCurrentTab();
 
-        // ?? Draw 3 tabs ??
-        String[] tabLabels = {"Config", "Loot", "Lists"};
-        for (int i = 0; i < 3; i++) {
+        // ?? Draw 4 tabs ??
+        String[] tabLabels = {"Config", "Loot", "Lists", "Route"};
+        int tabW = W / 4;
+        for (int i = 0; i < 4; i++) {
             int tx = x + i * tabW;
-            int tw = (i == 2) ? W - tabW * 2 : tabW;
+            int tw = tabWidth(i, tabW);
             boolean sel = (curTab == i);
             boolean hover = mx >= tx && mx < tx + tw && my >= tabY && my < y;
             ResourceLocation spr;
@@ -220,10 +225,10 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         g.blitSprite(RenderPipelines.GUI_TEXTURED, PANEL_SPRITE, x, y, W, H);
 
         // ?? Selected tab on top ??
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             if (curTab != i) continue;
             int tx = x + i * tabW;
-            int tw = (i == 2) ? W - tabW * 2 : tabW;
+            int tw = tabWidth(i, tabW);
             boolean hover = mx >= tx && mx < tx + tw && my >= tabY && my < y;
             ResourceLocation spr = hover ? TAB_SEL_HIGHLIGHTED_SPRITE : TAB_SELECTED_SPRITE;
             g.blitSprite(RenderPipelines.GUI_TEXTURED, spr, tx, tabY, tw, TAB_H + 3);
@@ -231,9 +236,9 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
         // ?? Tab labels ??
         int tabTextY = tabY + (TAB_H - font.lineHeight) / 2;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             int tx = x + i * tabW;
-            int tw = (i == 2) ? W - tabW * 2 : tabW;
+            int tw = tabWidth(i, tabW);
             g.drawString(font, tabLabels[i],
                 tx + (tw - font.width(tabLabels[i])) / 2, tabTextY,
                 curTab == i ? C_TITLE : C_DIM, false);
@@ -244,6 +249,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             case GolemMenu.TAB_CONFIG -> "Security Golem";
             case GolemMenu.TAB_LOOT -> "Collected Loot";
             case GolemMenu.TAB_LISTS -> "Allow / Deny Lists";
+            case GolemMenu.TAB_WAYPOINTS -> "Patrol Route";
             default -> "";
         };
         g.drawString(font, titleText, x + 8, y + 6, C_TITLE, false);
@@ -253,6 +259,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             case GolemMenu.TAB_CONFIG -> drawConfigTab(g, x, y);
             case GolemMenu.TAB_LOOT -> drawLootTab(g, x, y);
             case GolemMenu.TAB_LISTS -> drawListsTab(g, x, y);
+            case GolemMenu.TAB_WAYPOINTS -> drawWaypointsTab(g, x, y);
         }
 
         // ?? Player inventory ??
@@ -352,8 +359,8 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     @Override
     public void containerTick() {
         super.containerTick();
-        if (menu.getCurrentTab() == GolemMenu.TAB_LISTS) {
-            // Detect list changes from server sync
+        int curTab = menu.getCurrentTab();
+        if (curTab == GolemMenu.TAB_LISTS) {
             SecurityGolemEntity golem = menu.getGolem();
             int ig = golem.getIgnoreListNames().size();
             int at = golem.getAlwaysAttackListNames().size();
@@ -363,8 +370,12 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
                 listButtonsDirty = true;
             }
             refreshPickerEntries();
+            if (listButtonsDirty) rebuildListButtons();
+        } else if (curTab == GolemMenu.TAB_WAYPOINTS) {
             if (listButtonsDirty) {
-                rebuildListButtons();
+                clearListButtons();
+                rebuildWaypointButtons();
+                listButtonsDirty = false;
             }
         }
     }
@@ -592,4 +603,89 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         return Component.literal(name);
     }
 
+    // ---------- WAYPOINTS TAB ----------
+    private Button dwellDecBtn, dwellIncBtn;
+
+    private static final int WP_DWELL_ROW_Y  = 18;
+    private static final int WP_DWELL_ROW_H  = 16;
+    private static final int WP_SEP_Y        = WP_DWELL_ROW_Y + WP_DWELL_ROW_H + 2;
+    private static final int WP_LIST_START_Y = WP_SEP_Y + 6;
+
+    private void drawWaypointsTab(GuiGraphics g, int x, int y) {
+        SecurityGolemEntity golem = menu.getGolem();
+        List<BlockPos> waypoints = golem.getWaypoints();
+
+        // Dwell time row
+        int dwellY = y + WP_DWELL_ROW_Y;
+        int dwell = menu.getGolem().getDwellTicks();
+        int dwellSec = dwell / 20;
+        g.drawString(font, "Dwell time:", x + 8, dwellY + 3, C_TITLE, false);
+        String dwellVal = dwellSec + "s";
+        int valX = x + W - 62;
+        g.drawString(font, dwellVal, valX + (20 - font.width(dwellVal)) / 2, dwellY + 3, 0xFFFFFFFF, false);
+
+        // Separator
+        g.fill(x + 7, y + WP_SEP_Y, x + W - 7, y + WP_SEP_Y + 1, C_SEP);
+
+        // Waypoint list
+        int listY = y + WP_LIST_START_Y;
+        if (waypoints.isEmpty()) {
+            g.drawString(font, "No waypoints set.", x + 8, listY, C_DIM, false);
+            listY += 11;
+            g.drawString(font, "\u00a77Hold Wire Cutters and", x + 8, listY, C_DIM, false);
+            listY += 10;
+            g.drawString(font, "\u00a77crouch twice to add one.", x + 8, listY, C_DIM, false);
+        } else {
+            int maxVisible = (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12;
+            for (int i = 0; i < Math.min(waypoints.size(), maxVisible); i++) {
+                BlockPos wp = waypoints.get(i);
+                String name = golem.getWaypointName(i);
+                String label = (i + 1) + ". ";
+                if (!name.isEmpty()) label += name + " ";
+                label += "(" + wp.getX() + ", " + wp.getY() + ", " + wp.getZ() + ")";
+                boolean current = (i == golem.getCurrentWaypointIndex());
+                int col = current ? 0xFF55FF55 : C_TITLE;
+                g.drawString(font, (current ? "\u25CF " : "\u25CB ") + label, x + 8, listY, col, false);
+                g.drawString(font, "\u00a7c[x]", x + W - 24, listY, 0xFFFF5555, false);
+                listY += 12;
+            }
+            if (waypoints.size() > (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12) {
+                g.drawString(font, "\u00a78... +" + (waypoints.size() - (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12) + " more",
+                        x + 8, listY, C_DIM, false);
+            }
+        }
+    }
+
+    private void rebuildWaypointButtons() {
+        SecurityGolemEntity golem = menu.getGolem();
+        List<BlockPos> waypoints = golem.getWaypoints();
+        int x = leftPos;
+
+        // Dwell [-] and [+] buttons
+        int dwellBtnY = topPos + WP_DWELL_ROW_Y;
+        int dwellBtnH = WP_DWELL_ROW_H - 2;
+        dwellDecBtn = addRenderableWidget(Button.builder(Component.literal("-"),
+                btn -> clickButton(800))
+            .bounds(x + W - 44, dwellBtnY, 20, dwellBtnH).build());
+        dwellIncBtn = addRenderableWidget(Button.builder(Component.literal("+"),
+                btn -> clickButton(801))
+            .bounds(x + W - 22, dwellBtnY, 20, dwellBtnH).build());
+        listButtons.add(dwellDecBtn);
+        listButtons.add(dwellIncBtn);
+
+        // Waypoint [x] remove buttons
+        int maxVisible = (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12;
+        for (int i = 0; i < Math.min(waypoints.size(), maxVisible); i++) {
+            final int idx = i;
+            int ey = topPos + WP_LIST_START_Y + i * 12;
+            Button b = Button.builder(Component.literal("x"),
+                    btn -> {
+                        clickButton(700 + idx);
+                        menu.getGolem().removeWaypoint(idx);
+                        listButtonsDirty = true;
+                    })
+                .bounds(x + W - 22, ey - 1, 14, 12).build();
+            listButtons.add(addRenderableWidget(b));
+        }
+    }
 }

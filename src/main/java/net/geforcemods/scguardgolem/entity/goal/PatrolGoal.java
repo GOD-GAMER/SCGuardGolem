@@ -13,6 +13,7 @@ public class PatrolGoal extends Goal {
     private static final int RECALC_COOLDOWN_TICKS = 40;
     private int recalcCooldown = 0;
     private boolean pathStarted = false;
+    private int dwellCountdown = 0;
 
     public PatrolGoal(SecurityGolemEntity golem) {
         this.golem = golem;
@@ -28,7 +29,7 @@ public class PatrolGoal extends Goal {
     public boolean canContinueToUse() { return canUse(); }
 
     @Override
-    public void start() { pathStarted = false; recalcCooldown = 0; }
+    public void start() { pathStarted = false; recalcCooldown = 0; dwellCountdown = 0; }
 
     @Override
     public void stop() { golem.getNavigation().stop(); pathStarted = false; }
@@ -60,6 +61,15 @@ public class PatrolGoal extends Goal {
 
         double distSq = golem.blockPosition().distSqr(target);
         if (distSq <= WAYPOINT_REACH_DIST_SQ) {
+            // Dwell at waypoint before advancing
+            if (dwellCountdown <= 0 && golem.getDwellTicks() > 0) {
+                dwellCountdown = golem.getDwellTicks();
+            }
+            if (dwellCountdown > 0) {
+                dwellCountdown--;
+                golem.getNavigation().stop();
+                return;
+            }
             golem.advanceWaypoint();
             pathStarted = false;
             recalcCooldown = 0;
