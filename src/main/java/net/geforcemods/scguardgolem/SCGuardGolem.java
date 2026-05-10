@@ -4,8 +4,10 @@ import java.util.List;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.geforcemods.scguardgolem.network.AddWaypointPayload;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.geforcemods.securitycraft.items.WireCuttersItem;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,6 +26,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -39,7 +43,40 @@ public class SCGuardGolem {
     public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
+        modBus.addListener(SCGuardGolem::onRegisterPayloads);
         LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 1.21.8)");
+    }
+
+    private static void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar("1");
+        registrar.playToServer(
+                AddWaypointPayload.TYPE,
+                AddWaypointPayload.STREAM_CODEC,
+                (payload, ctx) -> ctx.enqueueWork(() -> {
+                    ServerPlayer sender = (ServerPlayer) ctx.player();
+                    if (sender == null) return;
+                    ServerLevel level = (ServerLevel) sender.level();
+                    BlockPos playerPos = sender.blockPosition();
+                    AABB box = new AABB(playerPos).inflate(32);
+                    List<SecurityGolemEntity> golems = level.getEntitiesOfClass(
+                            SecurityGolemEntity.class, box, g -> g.isOwner(sender));
+                    if (golems.isEmpty()) {
+                        sender.displayClientMessage(
+                                Component.literal("\u00a7c[Security Golem] No nearby golem found."), false);
+                        return;
+                    }
+                    SecurityGolemEntity nearest = golems.stream()
+                            .min((a, b) -> Double.compare(a.distanceToSqr(sender), b.distanceToSqr(sender)))
+                            .orElse(null);
+                    if (nearest != null) {
+                        nearest.addWaypoint(playerPos);
+                        sender.displayClientMessage(Component.literal(
+                                "\u00a76[Security Golem] \u00a7fWaypoint #"
+                                + (nearest.getWaypoints().size() - 1)
+                                + " added at " + playerPos.toShortString() + "."), false);
+                    }
+                })
+        );
     }
 
     @SubscribeEvent
@@ -83,18 +120,6 @@ public class SCGuardGolem {
             }
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
-            return;
-        }
-
-        // Crouch + right-click a Security Golem (no wire cutters) → add waypoint at golem's position
-        if (event.getTarget() instanceof SecurityGolemEntity golem && player.isCrouching() && !isWireCutters(held)) {
-            if (golem.isOwner(player) || player.hasPermissions(2)) {
-                golem.addWaypoint(golem.blockPosition());
-                player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7fWaypoint #"
-                        + (golem.getWaypoints().size() - 1) + " added at " + golem.blockPosition().toShortString() + "."), false);
-                event.setCancellationResult(InteractionResult.SUCCESS);
-                event.setCanceled(true);
-            }
             return;
         }
 
