@@ -13,7 +13,8 @@ public class PatrolGoal extends Goal {
     private static final int RECALC_COOLDOWN_TICKS = 40;
     private int recalcCooldown = 0;
     private boolean pathStarted = false;
-    private int dwellCountdown = 0;
+    /** -1 = idle (not dwelling); >0 = counting down; 0 = done, ready to advance */
+    private int dwellCountdown = -1;
 
     public PatrolGoal(SecurityGolemEntity golem) {
         this.golem = golem;
@@ -29,7 +30,7 @@ public class PatrolGoal extends Goal {
     public boolean canContinueToUse() { return canUse(); }
 
     @Override
-    public void start() { pathStarted = false; recalcCooldown = 0; dwellCountdown = 0; }
+    public void start() { pathStarted = false; recalcCooldown = 0; dwellCountdown = -1; }
 
     @Override
     public void stop() { golem.getNavigation().stop(); pathStarted = false; }
@@ -61,20 +62,24 @@ public class PatrolGoal extends Goal {
 
         double distSq = golem.blockPosition().distSqr(target);
         if (distSq <= WAYPOINT_REACH_DIST_SQ) {
-            // Dwell at waypoint before advancing
-            if (dwellCountdown <= 0 && golem.getDwellTicks() > 0) {
-                dwellCountdown = golem.getDwellTicks();
+            // Arm dwell once on arrival
+            if (dwellCountdown == -1) {
+                dwellCountdown = golem.getDwellTicks(); // 0 = no dwell, advance immediately
             }
             if (dwellCountdown > 0) {
                 dwellCountdown--;
                 golem.getNavigation().stop();
                 return;
             }
+            // Dwell finished (or no dwell) — advance
+            dwellCountdown = -1;
             golem.advanceWaypoint();
             pathStarted = false;
             recalcCooldown = 0;
             return;
         }
+        // Left waypoint range — reset dwell for next arrival
+        dwellCountdown = -1;
 
         if (recalcCooldown > 0) { recalcCooldown--; return; }
 

@@ -163,8 +163,6 @@ public class SCGuardGolem {
             if (first == null || (now - first) > DOUBLE_CROUCH_WINDOW) {
                 // First crouch of the pair
                 firstCrouchTick.put(uid, now);
-                player.sendSystemMessage(Component.literal(
-                        "\u00a76[Route] \u00a7fCrouch again within 1.5s to place a waypoint here."));
             } else {
                 // Second crouch within window → place waypoint
                 firstCrouchTick.remove(uid);
