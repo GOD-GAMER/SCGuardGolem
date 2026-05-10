@@ -1,11 +1,16 @@
 package net.geforcemods.scguardgolem;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import net.geforcemods.scguardgolem.command.SCGCommands;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.securitycraft.items.KeycardItem;
 import net.geforcemods.securitycraft.items.WireCuttersItem;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,6 +23,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.BellBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
@@ -25,7 +31,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -33,10 +39,20 @@ import com.mojang.logging.LogUtils;
 @EventBusSubscriber(modid = SCGuardGolem.MODID)
 public class SCGuardGolem {
     public static final String MODID = "scguardgolem";
-    public static final String VERSION = "1.2.0";
+    public static final String VERSION = "1.4.0";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public static boolean scLoaded;
+
+    // --- Double-crouch state (server-side, per player) ---
+    /** Game tick of the first crouch press, per player UUID. */
+    private static final Map<UUID, Long> firstCrouchTick = new HashMap<>();
+    /** Whether the player was crouching last tick. */
+    private static final Map<UUID, Boolean> wasCrouching = new HashMap<>();
+    /** Ticks within which a second crouch counts as a double-crouch (1.5 s). */
+    private static final int DOUBLE_CROUCH_WINDOW = 30;
+    /** How often (ticks) route particles are sent to the holding player. */
+    private static final int PARTICLE_INTERVAL = 3;
 
     public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
@@ -49,11 +65,9 @@ public class SCGuardGolem {
         SCGCommands.register(event.getDispatcher());
     }
 
-    /**
-     * Right-click a vanilla Iron Golem with any SecurityCraft keycard to
-     * convert it into a Security Guard Golem.
-     * Right-click a Security Guard Golem with Wire Cutters to open the GUI.
-     */
+    // -----------------------------------------------------------------------
+    //  Entity interact: Wire Cutters → GUI  |  Keycard → conversion
+    // -----------------------------------------------------------------------
     @SubscribeEvent
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (event.getLevel().isClientSide()) return;
@@ -61,7 +75,6 @@ public class SCGuardGolem {
         Player player = event.getEntity();
         ItemStack held = player.getItemInHand(event.getHand());
 
-        // Wire Cutters on a Security Golem → open configuration GUI
         if (event.getTarget() instanceof SecurityGolemEntity golem && isWireCutters(held)) {
             if (golem.isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
                 if (player instanceof ServerPlayer serverPlayer) {
@@ -75,7 +88,6 @@ public class SCGuardGolem {
             return;
         }
 
-        // Keycard on a vanilla Iron Golem → convert to Security Golem
         if (!(event.getTarget() instanceof IronGolem ironGolem)) return;
         if (event.getTarget() instanceof SecurityGolemEntity) return;
         if (!isKeycardItem(held)) return;
@@ -95,16 +107,15 @@ public class SCGuardGolem {
         serverLevel.addFreshEntity(golem);
 
         held.shrink(1);
-        player.sendSystemMessage(
-                Component.translatable("scguardgolem.conversion.success"));
+        player.sendSystemMessage(Component.translatable("scguardgolem.conversion.success"));
 
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
     }
 
-    /**
-     * Right-click a bell → recall all owned golems to their first waypoint.
-     */
+    // -----------------------------------------------------------------------
+    //  Bell right-click → recall owned golems
+    // -----------------------------------------------------------------------
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide()) return;
@@ -122,47 +133,142 @@ public class SCGuardGolem {
         }
     }
 
-    /**
-     * Crouch + left-click with a reinforced lever → add waypoint at that block pos
-     * for the nearest owned golem.
-     */
+    // -----------------------------------------------------------------------
+    //  Player tick: double-crouch waypoint placement + route particles
+    // -----------------------------------------------------------------------
     @SubscribeEvent
-    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
-        if (event.getLevel().isClientSide()) return;
+    public static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
-        if (!player.isCrouching()) return;
-        ItemStack held = player.getItemInHand(event.getHand());
-        if (!isReinforcedLever(held)) return;
+        if (!(player.level() instanceof ServerLevel serverLevel)) return;
 
-        ServerLevel serverLevel = (ServerLevel) event.getLevel();
-        AABB searchBox = new AABB(player.blockPosition()).inflate(32);
-        List<SecurityGolemEntity> golems = serverLevel.getEntitiesOfClass(SecurityGolemEntity.class, searchBox,
-                g -> g.isOwner(player));
-        if (golems.isEmpty()) {
-            player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] No nearby golem found."));
+        ItemStack held = player.getMainHandItem();
+        UUID uid = player.getUUID();
+
+        // Only active when holding Wire Cutters
+        if (!isWireCutters(held)) {
+            wasCrouching.remove(uid);
+            firstCrouchTick.remove(uid);
             return;
         }
-        SecurityGolemEntity nearest = golems.stream()
+
+        // --- Double-crouch detection ---
+        boolean crouching = player.isCrouching();
+        boolean was = wasCrouching.getOrDefault(uid, false);
+
+        if (crouching && !was) {
+            // Rising edge: player just started crouching
+            long now = serverLevel.getGameTime();
+            Long first = firstCrouchTick.get(uid);
+
+            if (first == null || (now - first) > DOUBLE_CROUCH_WINDOW) {
+                // First crouch of the pair
+                firstCrouchTick.put(uid, now);
+                player.sendSystemMessage(Component.literal(
+                        "\u00a76[Route] \u00a7fCrouch again within 1.5s to place a waypoint here."));
+            } else {
+                // Second crouch within window → place waypoint
+                firstCrouchTick.remove(uid);
+                placeWaypoint(player, serverLevel);
+            }
+        }
+        wasCrouching.put(uid, crouching);
+
+        // --- Route particles (every PARTICLE_INTERVAL ticks) ---
+        if (serverLevel.getGameTime() % PARTICLE_INTERVAL == 0) {
+            showRouteParticles(player, serverLevel);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    //  Waypoint placement helper
+    // -----------------------------------------------------------------------
+    private static void placeWaypoint(Player player, ServerLevel level) {
+        AABB box = new AABB(player.blockPosition()).inflate(64);
+        SecurityGolemEntity nearest = level.getEntitiesOfClass(SecurityGolemEntity.class, box,
+                        g -> g.isOwner(player))
+                .stream()
                 .min((a, b) -> Double.compare(a.distanceToSqr(player), b.distanceToSqr(player)))
                 .orElse(null);
-        if (nearest != null) {
-            nearest.addWaypoint(event.getPos());
-            player.sendSystemMessage(Component.literal("\u00a76[Security Golem] \u00a7fWaypoint #"
-                    + (nearest.getWaypoints().size() - 1) + " added at " + event.getPos().toShortString() + "."));
-            event.setCanceled(true);
+
+        if (nearest == null) {
+            player.sendSystemMessage(Component.literal("\u00a7c[Route] No nearby Security Golem found (within 64 blocks)."));
+            return;
+        }
+
+        BlockPos pos = player.blockPosition();
+        nearest.addWaypoint(pos);
+        int num = nearest.getWaypoints().size();
+        player.sendSystemMessage(Component.literal(
+                "\u00a76[Route] \u00a7aWaypoint #" + num + " placed at \u00a7f" + pos.toShortString()));
+
+        // Burst of happy-villager particles visible to the placing player
+        if (player instanceof ServerPlayer sp) {
+            level.sendParticles(sp, ParticleTypes.HAPPY_VILLAGER, true, true,
+                    pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5,
+                    12, 0.3, 0.3, 0.3, 0.0);
         }
     }
 
-    public static boolean isReinforcedLever(ItemStack stack) {
-        if (!scLoaded || stack.isEmpty()) return false;
-        try {
-            return stack.getItem() instanceof net.minecraft.world.item.BlockItem bi
-                    && bi.getBlock() instanceof net.geforcemods.securitycraft.blocks.reinforced.ReinforcedLeverBlock;
-        } catch (NoClassDefFoundError e) {
-            return false;
+    // -----------------------------------------------------------------------
+    //  Route particle renderer (server → single player)
+    // -----------------------------------------------------------------------
+    private static void showRouteParticles(Player player, ServerLevel level) {
+        if (!(player instanceof ServerPlayer sp)) return;
+
+        AABB box = new AABB(player.blockPosition()).inflate(64);
+        SecurityGolemEntity nearest = level.getEntitiesOfClass(SecurityGolemEntity.class, box,
+                        g -> g.isOwner(player))
+                .stream()
+                .min((a, b) -> Double.compare(a.distanceToSqr(player), b.distanceToSqr(player)))
+                .orElse(null);
+
+        if (nearest == null) return;
+
+        List<BlockPos> waypoints = nearest.getWaypoints();
+        if (waypoints.isEmpty()) return;
+
+        int currentIdx = nearest.getCurrentWaypointIndex();
+
+        for (int i = 0; i < waypoints.size(); i++) {
+            BlockPos wp = waypoints.get(i);
+            double wx = wp.getX() + 0.5;
+            double wy = wp.getY() + 1.15;
+            double wz = wp.getZ() + 0.5;
+
+            // Node marker: flame = current target, end_rod = others
+            if (i == currentIdx) {
+                level.sendParticles(sp, ParticleTypes.FLAME, true, true, wx, wy, wz, 3, 0.1, 0.1, 0.1, 0.0);
+            } else {
+                level.sendParticles(sp, ParticleTypes.END_ROD, true, true, wx, wy, wz, 2, 0.08, 0.08, 0.08, 0.0);
+            }
+
+            // Line from this waypoint to the next (wraps around)
+            if (waypoints.size() > 1) {
+                BlockPos next = waypoints.get((i + 1) % waypoints.size());
+                Vec3 from = new Vec3(wx, wy, wz);
+                Vec3 to   = new Vec3(next.getX() + 0.5, next.getY() + 1.15, next.getZ() + 0.5);
+                double dist = from.distanceTo(to);
+                int steps = Math.max(1, Math.min((int) dist, 48));
+                for (int s = 1; s < steps; s++) {
+                    double t  = (double) s / steps;
+                    double lx = from.x + (to.x - from.x) * t;
+                    double ly = from.y + (to.y - from.y) * t;
+                    double lz = from.z + (to.z - from.z) * t;
+                    level.sendParticles(sp, ParticleTypes.END_ROD, true, true, lx, ly, lz, 1, 0, 0, 0, 0.0);
+                }
+            }
         }
+
+        // Preview dot at the player's own feet
+        BlockPos pp = player.blockPosition();
+        level.sendParticles(sp, ParticleTypes.CRIT, true, true,
+                pp.getX() + 0.5, pp.getY() + 0.3, pp.getZ() + 0.5,
+                1, 0.15, 0.0, 0.15, 0.0);
     }
 
+    // -----------------------------------------------------------------------
+    //  Item helpers
+    // -----------------------------------------------------------------------
     public static boolean isKeycardItem(ItemStack stack) {
         if (!scLoaded || stack.isEmpty()) return false;
         try {
