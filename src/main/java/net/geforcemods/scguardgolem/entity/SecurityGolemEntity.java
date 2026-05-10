@@ -206,6 +206,16 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     public void writeClientSideData(AbstractContainerMenu menu, net.minecraft.network.RegistryFriendlyByteBuf buf) {
         buf.writeInt(this.getId());
         buf.writeInt(getLootRows());
+        // Waypoints
+        buf.writeInt(waypoints.size());
+        for (int i = 0; i < waypoints.size(); i++) {
+            BlockPos wp = waypoints.get(i);
+            buf.writeInt(wp.getX());
+            buf.writeInt(wp.getY());
+            buf.writeInt(wp.getZ());
+            buf.writeUtf(i < waypointNames.size() ? waypointNames.get(i) : "");
+        }
+        buf.writeInt(currentWaypointIndex);
     }
 
     @Override
@@ -444,6 +454,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     public BlockPos getCurrentWaypoint() { return waypoints.isEmpty() ? null : waypoints.get(currentWaypointIndex); }
     public void advanceWaypoint() { if (!waypoints.isEmpty()) currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.size(); }
     public int getCurrentWaypointIndex() { return currentWaypointIndex; }
+    public void setCurrentWaypointIndex(int idx) { currentWaypointIndex = (waypoints.isEmpty() ? 0 : Math.max(0, Math.min(idx, waypoints.size() - 1))); }
     public boolean isPatrolling() { return entityData.get(PATROLLING); }
     public void setPatrolling(boolean p) { entityData.set(PATROLLING, p); }
     public double getPatrolSpeed() { return patrolSpeed; }
