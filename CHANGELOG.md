@@ -7,6 +7,9 @@
 - **Loot Filter**: Storage module now supports an item filter — when configured, only matching items are collected
 - **Correct Loot Pickup Logic**: Empty filter = collect all; filter set = only collect listed items
 - **Patrol Resume After Combat**: Golem resumes patrol from saved waypoint index after losing a target
+- **Double-Crouch Route Setup**: Hold Wire Cutters and crouch twice within 1.5s to place a waypoint at your feet — no block required
+- **Route Particle Visualizer**: Holding Wire Cutters shows a live particle trail connecting all waypoints of your nearest golem; current target glows orange, others white; a preview dot marks where the next waypoint will land
+- **Removed reinforced lever requirement**: Waypoints no longer need a reinforced lever item to place
 
 ## 1.3.0
 - **3-Tab GUI**: Config, Loot, and Lists tabs accessible via Wire Cutters right-click
