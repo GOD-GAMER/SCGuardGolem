@@ -7,6 +7,7 @@ import java.util.Set;
 
 import net.geforcemods.scguardgolem.SCGContent;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.LivingEntity;
@@ -27,7 +28,8 @@ public class GolemMenu extends AbstractContainerMenu {
 
     private static final int DATA_PATROL = 0;
     private static final int DATA_THREAT = 1;
-    private static final int DATA_COUNT = 2;
+    private static final int DATA_DWELL  = 2;
+    private static final int DATA_COUNT  = 3;
 
     public static final int TAB_CONFIG = 0;
     public static final int TAB_LOOT = 1;
@@ -72,6 +74,7 @@ public class GolemMenu extends AbstractContainerMenu {
                 return switch (index) {
                     case DATA_PATROL -> golem.isPatrolling() ? 1 : 0;
                     case DATA_THREAT -> golem.getThreatMode().ordinal();
+                    case DATA_DWELL  -> golem.getDwellTicks();
                     default -> 0;
                 };
             }
@@ -79,6 +82,7 @@ public class GolemMenu extends AbstractContainerMenu {
                 switch (index) {
                     case DATA_PATROL -> golem.setPatrolling(value != 0);
                     case DATA_THREAT -> golem.setThreatMode(SecurityGolemEntity.ThreatMode.fromOrdinal(value));
+                    case DATA_DWELL  -> golem.setDwellTicks(Math.max(0, value));
                 }
             }
             @Override public int getCount() { return DATA_COUNT; }
@@ -150,6 +154,16 @@ public class GolemMenu extends AbstractContainerMenu {
     private static SecurityGolemEntity prepareGolemFromBuf(Inventory playerInv, RegistryFriendlyByteBuf buf) {
         int entityId = buf.readInt();
         int serverLootRows = buf.readInt();
+        // Waypoints
+        int wpCount = buf.readInt();
+        List<BlockPos> wpPositions = new ArrayList<>(wpCount);
+        List<String> wpNames = new ArrayList<>(wpCount);
+        for (int i = 0; i < wpCount; i++) {
+            wpPositions.add(new BlockPos(buf.readInt(), buf.readInt(), buf.readInt()));
+            wpNames.add(buf.readUtf());
+        }
+        int currentWpIndex = buf.readInt();
+
         var entity = playerInv.player.level().getEntity(entityId);
         if (!(entity instanceof SecurityGolemEntity g))
             throw new IllegalStateException("No SecurityGolemEntity with id " + entityId);
@@ -163,6 +177,14 @@ public class GolemMenu extends AbstractContainerMenu {
                 resized.setItem(i, current.getItem(i));
             g.setLootInventory(resized);
         }
+
+        // Inject waypoints from server into client-side entity
+        g.clearWaypoints();
+        for (int i = 0; i < wpPositions.size(); i++) {
+            g.addWaypoint(wpPositions.get(i), wpNames.get(i));
+        }
+        g.setCurrentWaypointIndex(currentWpIndex);
+
         return g;
     }
 
@@ -271,8 +293,8 @@ public class GolemMenu extends AbstractContainerMenu {
             golem.removeWaypoint(idx);
             return true;
         }
-        // Dwell time: 800 = decrease, 801 = increase
-        if (buttonId == 800) { golem.setDwellTicks(golem.getDwellTicks() - 20); return true; }
+        // Dwell time: 800 = decrease by 1 s, 801 = increase by 1 s
+        if (buttonId == 800) { golem.setDwellTicks(Math.max(0, golem.getDwellTicks() - 20)); return true; }
         if (buttonId == 801) { golem.setDwellTicks(golem.getDwellTicks() + 20); return true; }
         // Remove loot filter entry: button IDs 900+
         if (buttonId >= 900 && buttonId < 1000) {
@@ -321,6 +343,8 @@ public class GolemMenu extends AbstractContainerMenu {
     public SecurityGolemEntity getGolem() { return golem; }
     public int getLootRows() { return lootContainer.getContainerSize() / 9; }
     public ContainerData getData() { return data; }
+    /** Returns dwell ticks from the synced ContainerData (safe to call client-side). */
+    public int getSyncedDwellTicks() { return data.get(DATA_DWELL); }
     public int getPlayerInvY() { return playerInvY; }
     public int getGuiHeight() { return playerInvY + 83; }
 }
