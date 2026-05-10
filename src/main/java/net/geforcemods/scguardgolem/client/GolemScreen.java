@@ -646,7 +646,12 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             final int idx = i;
             int ey = topPos + WP_LIST_START_Y + i * 12;
             Button b = Button.builder(Component.literal("x"),
-                    btn -> { clickButton(700 + idx); listButtonsDirty = true; })
+                    btn -> {
+                        clickButton(700 + idx);
+                        // Optimistically update client-side entity so the list refreshes immediately
+                        menu.getGolem().removeWaypoint(idx);
+                        listButtonsDirty = true;
+                    })
                 .bounds(x + W - 22, ey - 1, 14, 12).build();
             listButtons.add(addRenderableWidget(b));
         }
