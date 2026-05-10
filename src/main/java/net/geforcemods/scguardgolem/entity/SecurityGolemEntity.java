@@ -2,6 +2,7 @@ package net.geforcemods.scguardgolem.entity;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -93,9 +94,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     private SimpleContainer lootInventory = new SimpleContainer(BASE_LOOT_SLOTS);
 
     private final List<BlockPos> waypoints = new ArrayList<>();
+    private final List<String> waypointNames = new ArrayList<>();
     private List<BlockPos> waypointsView;
     private int currentWaypointIndex = 0;
     private double patrolSpeed = 1.0;
+    private int dwellTicks = 0;
+
+    // Loot item filter (item registry names)
+    private final LinkedHashSet<String> lootFilter = new LinkedHashSet<>();
 
     // Name-based allow/deny lists
     public static final int MAX_LIST_ENTRIES = 8;
@@ -104,6 +110,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
     // Bell recall state
     private boolean recalling = false;
+
+    // Patrol resume: index saved when combat starts
+    private int savedWaypointIndex = 0;
+    private boolean hadTarget = false;
 
     private String lootPassword = "";
     private int pickupCooldown = 0;
@@ -162,6 +172,24 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     }
 
     public boolean isScanTick() { return scanTimer == 0; }
+
+    /** Track target acquisition so PatrolGoal can resume at saved waypoint after combat. */
+    @Override
+    public void setTarget(net.minecraft.world.entity.LivingEntity target) {
+        boolean hadNoTarget = this.getTarget() == null;
+        super.setTarget(target);
+        if (!level().isClientSide()) {
+            if (hadNoTarget && target != null) {
+                // Save current waypoint when combat starts
+                savedWaypointIndex = currentWaypointIndex;
+                hadTarget = true;
+            } else if (target == null && hadTarget) {
+                // Combat ended — restore waypoint
+                currentWaypointIndex = savedWaypointIndex;
+                hadTarget = false;
+            }
+        }
+    }
 
     // -- MenuProvider --
     @Override
@@ -353,6 +381,8 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         for (ItemEntity itemEntity : items) {
             if (!itemEntity.isAlive()) continue;
             ItemStack stack = itemEntity.getItem();
+            // If a filter is active, only collect matching items
+            if (!lootFilter.isEmpty() && !isFiltered(stack)) continue;
             ItemStack remainder = lootInventory.addItem(stack.copy());
             if (remainder.isEmpty()) {
                 itemEntity.discard();
@@ -386,17 +416,31 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         if (v == null || v.size() != waypoints.size()) { v = Collections.unmodifiableList(new ArrayList<>(waypoints)); waypointsView = v; }
         return v;
     }
-    public void addWaypoint(BlockPos pos) { waypoints.add(pos); waypointsView = null; }
+    public void addWaypoint(BlockPos pos) { addWaypoint(pos, ""); }
+    public void addWaypoint(BlockPos pos, String name) {
+        waypoints.add(pos);
+        waypointNames.add(name != null ? name : "");
+        waypointsView = null;
+    }
+    public String getWaypointName(int index) {
+        if (index < 0 || index >= waypointNames.size()) return "";
+        return waypointNames.get(index);
+    }
+    public void setWaypointName(int index, String name) {
+        if (index >= 0 && index < waypointNames.size())
+            waypointNames.set(index, name != null ? name : "");
+    }
     public boolean removeWaypoint(int index) {
         if (index >= 0 && index < waypoints.size()) {
             waypoints.remove(index);
+            if (index < waypointNames.size()) waypointNames.remove(index);
             waypointsView = null;
             if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
             return true;
         }
         return false;
     }
-    public void clearWaypoints() { waypoints.clear(); waypointsView = null; currentWaypointIndex = 0; }
+    public void clearWaypoints() { waypoints.clear(); waypointNames.clear(); waypointsView = null; currentWaypointIndex = 0; }
     public BlockPos getCurrentWaypoint() { return waypoints.isEmpty() ? null : waypoints.get(currentWaypointIndex); }
     public void advanceWaypoint() { if (!waypoints.isEmpty()) currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.size(); }
     public int getCurrentWaypointIndex() { return currentWaypointIndex; }
@@ -404,6 +448,21 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     public void setPatrolling(boolean p) { entityData.set(PATROLLING, p); }
     public double getPatrolSpeed() { return patrolSpeed; }
     public void setPatrolSpeed(double s) { this.patrolSpeed = Math.max(0.1, Math.min(s, 3.0)); }
+
+    // -- Dwell time --
+    public int getDwellTicks() { return dwellTicks; }
+    public void setDwellTicks(int ticks) { this.dwellTicks = Math.max(0, Math.min(ticks, 200)); }
+
+    // -- Loot filter --
+    public Set<String> getLootFilter() { return Collections.unmodifiableSet(lootFilter); }
+    public void addLootFilter(String itemId) { if (itemId != null && !itemId.isBlank()) lootFilter.add(itemId); }
+    public void removeLootFilter(String itemId) { lootFilter.remove(itemId); }
+    public void clearLootFilter() { lootFilter.clear(); }
+    public boolean isFiltered(ItemStack stack) {
+        if (lootFilter.isEmpty() || stack.isEmpty()) return false;
+        String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+        return lootFilter.contains(id);
+    }
 
     // -- Threat Mode --
     public ThreatMode getThreatMode() { return ThreatMode.fromOrdinal(entityData.get(THREAT_MODE)); }
@@ -437,6 +496,15 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         tag.putInt("ThreatMode", getThreatMode().ordinal());
         tag.putString("LootPassword", lootPassword);
         tag.putBoolean("Recalling", recalling);
+        tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("SavedWaypointIndex", savedWaypointIndex);
+
+        // Loot filter
+        CompoundTag filterTag = new CompoundTag();
+        filterTag.putInt("Count", lootFilter.size());
+        int fi = 0;
+        for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
+        tag.store("LootFilter", CompoundTag.CODEC, filterTag);
 
         CompoundTag listsTag = new CompoundTag();
         listsTag.putInt("IgnoreCount", ignoreList.size());
@@ -454,6 +522,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             waypointTag.putInt("X" + i, wp.getX());
             waypointTag.putInt("Y" + i, wp.getY());
             waypointTag.putInt("Z" + i, wp.getZ());
+            waypointTag.putString("Name" + i, i < waypointNames.size() ? waypointNames.get(i) : "");
         }
         tag.store("Waypoints", CompoundTag.CODEC, waypointTag);
 
@@ -472,6 +541,15 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
         lootPassword = tag.getStringOr("LootPassword", "");
         recalling = tag.getBooleanOr("Recalling", false);
+        dwellTicks = tag.getIntOr("DwellTicks", 0);
+        savedWaypointIndex = tag.getIntOr("SavedWaypointIndex", 0);
+
+        // Loot filter
+        lootFilter.clear();
+        tag.read("LootFilter", CompoundTag.CODEC).ifPresent(ft -> {
+            int fc = ft.getIntOr("Count", 0);
+            for (int i = 0; i < fc; i++) { String id = ft.getStringOr("Filter" + i, ""); if (!id.isEmpty()) lootFilter.add(id); }
+        });
 
         ignoreList.clear();
         attackList.clear();
@@ -487,8 +565,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         waypointsView = null;
         tag.read("Waypoints", CompoundTag.CODEC).ifPresent(wc -> {
             int count = wc.getIntOr("Count", 0);
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < count; i++) {
                 waypoints.add(new BlockPos(wc.getIntOr("X" + i, 0), wc.getIntOr("Y" + i, 0), wc.getIntOr("Z" + i, 0)));
+                waypointNames.add(wc.getStringOr("Name" + i, ""));
+            }
         });
 
         moduleInventory.clearContent();

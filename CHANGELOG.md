@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0
+- **4-Tab GUI**: Added new "Route" tab for managing patrol waypoints directly from the GUI
+- **Patrol Dwell Time**: Set ticks to pause at each waypoint before moving on (adjustable with +/- buttons in Route tab)
+- **Waypoint Manager UI**: View all waypoints with coordinates, remove individual waypoints from the GUI; current waypoint highlighted in green
+- **Loot Filter**: Storage module now supports an item filter — when configured, only matching items are collected
+- **Correct Loot Pickup Logic**: Empty filter = collect all; filter set = only collect listed items
+- **Patrol Resume After Combat**: Golem resumes patrol from saved waypoint index after losing a target
+
 ## 1.3.0
 - **3-Tab GUI**: Config, Loot, and Lists tabs accessible via Wire Cutters right-click
 - **Scrollable Loot Inventory**: Up to 6 rows with mouse wheel scrolling
