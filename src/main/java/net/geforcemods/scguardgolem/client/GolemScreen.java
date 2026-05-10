@@ -24,7 +24,7 @@ import java.util.Set;
 
 public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
-    // ?? Sprites ??
+    // Sprites registered in the GUI atlas
     private static final Identifier PANEL_SPRITE = Identifier.parse("scguardgolem:scg_panel");
     private static final Identifier SLOT_SPRITE = Identifier.withDefaultNamespace("container/slot");
     private static final Identifier TAB_SPRITE = Identifier.withDefaultNamespace("widget/tab");
@@ -55,6 +55,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     private boolean listButtonsDirty = true;
     private int lastIgnoreSize = -1;
     private int lastAttackSize = -1;
+    private int lastWaypointSize = -1;
 
     public GolemScreen(GolemMenu menu, Inventory playerInv, Component title) {
         super(menu, playerInv, title, W, menu.getGuiHeight());
@@ -196,7 +197,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             if (!sel) g.blitSprite(RenderPipelines.GUI_TEXTURED, spr, tx, tabY, tw, TAB_H + 3);
         }
 
-        // ?? Panel background ??
+        // Panel background
         g.blitSprite(RenderPipelines.GUI_TEXTURED, PANEL_SPRITE, x, y, W, H);
 
         // ?? Selected tab on top ??
@@ -227,7 +228,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             case GolemMenu.TAB_WAYPOINTS -> "Patrol Route";
             default -> "";
         };
-        g.text(font, titleText, x + 8, y + 6, C_TITLE, false);
+        g.text(font, titleText, x + (W - font.width(titleText)) / 2, y + 6, C_TITLE, false);
 
         // ?? Tab content ??
         switch (curTab) {
@@ -347,7 +348,9 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             refreshPickerEntries();
             if (listButtonsDirty) rebuildListButtons();
         } else if (curTab == GolemMenu.TAB_WAYPOINTS) {
-            if (listButtonsDirty) {
+            int wpSize = menu.getGolem().getWaypoints().size();
+            if (listButtonsDirty || wpSize != lastWaypointSize) {
+                lastWaypointSize = wpSize;
                 clearListButtons();
                 rebuildWaypointButtons();
                 listButtonsDirty = false;
@@ -564,27 +567,41 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     // Dwell-time buttons (rebuilt with list buttons)
     private Button dwellDecBtn, dwellIncBtn;
 
+    // Y offset constants that both draw and button-rebuild use so they stay in sync
+    private static final int WP_DWELL_ROW_Y    = 18;   // top of dwell row (relative to panel top)
+    private static final int WP_DWELL_ROW_H    = 16;   // height of dwell row
+    private static final int WP_SEP_Y          = WP_DWELL_ROW_Y + WP_DWELL_ROW_H + 2; // separator
+    private static final int WP_LIST_START_Y   = WP_SEP_Y + 6; // first waypoint entry
+
     private void drawWaypointsTab(GuiGraphicsExtractor g, int x, int y) {
         SecurityGolemEntity golem = menu.getGolem();
         List<BlockPos> waypoints = golem.getWaypoints();
 
-        int curY = y + 20;
+        // ── Dwell time row ────────────────────────────────────────────────
+        int dwellY = y + WP_DWELL_ROW_Y;
+        // Read from synced ContainerData so client always shows the live value
+        int dwell = menu.getSyncedDwellTicks();
+        int dwellSec = dwell / 20;
+        g.text(font, "Dwell time:", x + 8, dwellY + 3, C_TITLE, false);
+        // The actual dwell value, centered between the two buttons drawn by rebuildWaypointButtons
+        String dwellVal = dwellSec + "s";
+        int valX = x + W - 62; // left edge of the value text area (buttons at W-44 and W-22)
+        g.text(font, dwellVal, valX + (20 - font.width(dwellVal)) / 2, dwellY + 3, 0xFFFFFFFF, false);
 
-        // Dwell time row
-        int dwell = golem.getDwellTicks();
-        String dwellStr = "Dwell: " + (dwell / 20) + "s (" + dwell + "t)";
-        g.text(font, dwellStr, x + 8, curY, C_DIM, false);
-        curY += 14;
+        // ── Separator ─────────────────────────────────────────────────────
+        int sepY = y + WP_SEP_Y;
+        g.fill(x + 7, sepY, x + W - 7, sepY + 1, C_SEP);
 
-        g.fill(x + 7, curY, x + W - 7, curY + 1, C_SEP);
-        curY += 4;
-
+        // ── Waypoint list ─────────────────────────────────────────────────
+        int listY = y + WP_LIST_START_Y;
         if (waypoints.isEmpty()) {
-            g.text(font, "\u00a77No waypoints.", x + 8, curY, C_DIM, false);
-            g.text(font, "\u00a77Place a Reinforced Lever", x + 8, curY + 10, C_DIM, false);
-            g.text(font, "\u00a77near the golem to add one.", x + 8, curY + 20, C_DIM, false);
+            g.text(font, "No waypoints set.", x + 8, listY, C_DIM, false);
+            listY += 11;
+            g.text(font, "\u00a77Hold Wire Cutters and", x + 8, listY, C_DIM, false);
+            listY += 10;
+            g.text(font, "\u00a77crouch twice to add one.", x + 8, listY, C_DIM, false);
         } else {
-            int maxVisible = (menu.getPlayerInvY() - 45) / 12;
+            int maxVisible = (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12;
             for (int i = 0; i < Math.min(waypoints.size(), maxVisible); i++) {
                 BlockPos wp = waypoints.get(i);
                 String name = golem.getWaypointName(i);
@@ -592,42 +609,47 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
                 if (!name.isEmpty()) label += name + " ";
                 label += "(" + wp.getX() + ", " + wp.getY() + ", " + wp.getZ() + ")";
                 boolean current = (i == golem.getCurrentWaypointIndex());
-                int col = current ? 0xFF55FF55 : 0xFFFFFFFF;
-                g.text(font, "\u25CF " + label, x + 8, curY, col, false);
-                g.text(font, "\u00a7c[x]", x + W - 24, curY, 0xFFFF5555, false);
-                curY += 12;
+                int col = current ? 0xFF55FF55 : C_TITLE;
+                g.text(font, (current ? "\u25CF " : "\u25CB ") + label, x + 8, listY, col, false);
+                // [x] label hint beside the button
+                g.text(font, "\u00a7c[x]", x + W - 24, listY, 0xFFFF5555, false);
+                listY += 12;
             }
-            if (waypoints.size() > maxVisible) {
-                g.text(font, "\u00a78... +" + (waypoints.size() - maxVisible) + " more", x + 8, curY, C_DIM, false);
+            if (waypoints.size() > (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12) {
+                g.text(font, "\u00a78... +" + (waypoints.size() - (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12) + " more",
+                        x + 8, listY, C_DIM, false);
             }
         }
     }
 
-    /** Rebuild waypoint remove-buttons and dwell-time buttons when on Waypoints tab. */
+    /** Rebuild waypoint remove-buttons and dwell +/- buttons. */
     private void rebuildWaypointButtons() {
         SecurityGolemEntity golem = menu.getGolem();
         List<BlockPos> waypoints = golem.getWaypoints();
         int x = leftPos;
-        int baseY = topPos + 20 + 14 + 5; // matches drawWaypointsTab curY after separator
 
-        int maxVisible = (menu.getPlayerInvY() - 45) / 12;
-        for (int i = 0; i < Math.min(waypoints.size(), maxVisible); i++) {
-            final int idx = i;
-            int ey = baseY + i * 12;
-            Button b = Button.builder(Component.literal("\u00a7cx"),
-                    btn -> { clickButton(700 + idx); listButtonsDirty = true; })
-                .bounds(x + W - 22, ey, 14, 12).build();
-            listButtons.add(addRenderableWidget(b));
-        }
-
-        // Dwell +/- buttons
-        int dwellBtnY = topPos + 20;
+        // Dwell [-] and [+] buttons — right-aligned beside the dwell label
+        int dwellBtnY = topPos + WP_DWELL_ROW_Y;
+        int dwellBtnH  = WP_DWELL_ROW_H - 2;
         dwellDecBtn = addRenderableWidget(Button.builder(Component.literal("-"),
-                btn -> clickButton(800)).bounds(x + W - 40, dwellBtnY, 16, 12).build());
+                btn -> clickButton(800))
+            .bounds(x + W - 44, dwellBtnY, 20, dwellBtnH).build());
         dwellIncBtn = addRenderableWidget(Button.builder(Component.literal("+"),
-                btn -> clickButton(801)).bounds(x + W - 20, dwellBtnY, 16, 12).build());
+                btn -> clickButton(801))
+            .bounds(x + W - 22, dwellBtnY, 20, dwellBtnH).build());
         listButtons.add(dwellDecBtn);
         listButtons.add(dwellIncBtn);
+
+        // Waypoint [x] remove buttons
+        int maxVisible = (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12;
+        for (int i = 0; i < Math.min(waypoints.size(), maxVisible); i++) {
+            final int idx = i;
+            int ey = topPos + WP_LIST_START_Y + i * 12;
+            Button b = Button.builder(Component.literal("x"),
+                    btn -> { clickButton(700 + idx); listButtonsDirty = true; })
+                .bounds(x + W - 22, ey - 1, 14, 12).build();
+            listButtons.add(addRenderableWidget(b));
+        }
     }
 
     }
