@@ -665,10 +665,10 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         int dwellBtnY = topPos + WP_DWELL_ROW_Y;
         int dwellBtnH = WP_DWELL_ROW_H - 2;
         dwellDecBtn = addRenderableWidget(Button.builder(Component.literal("-"),
-                btn -> clickButton(800))
+                btn -> { clickButton(800); menu.getGolem().setDwellTicks(menu.getGolem().getDwellTicks() - 20); })
             .bounds(x + W - 44, dwellBtnY, 20, dwellBtnH).build());
         dwellIncBtn = addRenderableWidget(Button.builder(Component.literal("+"),
-                btn -> clickButton(801))
+                btn -> { clickButton(801); menu.getGolem().setDwellTicks(menu.getGolem().getDwellTicks() + 20); })
             .bounds(x + W - 22, dwellBtnY, 20, dwellBtnH).build());
         listButtons.add(dwellDecBtn);
         listButtons.add(dwellIncBtn);

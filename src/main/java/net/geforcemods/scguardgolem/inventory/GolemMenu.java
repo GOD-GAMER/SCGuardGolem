@@ -163,6 +163,24 @@ public class GolemMenu extends AbstractContainerMenu {
                 resized.setItem(i, current.getItem(i));
             g.setLootInventory(resized);
         }
+
+        // Hydrate dwell ticks
+        int dwell = buf.readInt();
+        g.setDwellTicks(dwell);
+
+        // Hydrate waypoints
+        int wpCount = buf.readInt();
+        g.clearWaypoints();
+        for (int i = 0; i < wpCount; i++) {
+            int wx = buf.readInt();
+            int wy = buf.readInt();
+            int wz = buf.readInt();
+            String name = buf.readUtf();
+            g.addWaypoint(new net.minecraft.core.BlockPos(wx, wy, wz), name);
+        }
+        int wpIdx = buf.readInt();
+        g.setCurrentWaypointIndex(wpIdx);
+
         return g;
     }
 

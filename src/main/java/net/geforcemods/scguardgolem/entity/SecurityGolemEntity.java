@@ -214,6 +214,18 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
                     serverPlayer.openMenu(this, buf -> {
                         buf.writeInt(this.getId());
                         buf.writeInt(this.getLootRows());
+                        // Dwell ticks
+                        buf.writeInt(this.dwellTicks);
+                        // Waypoints
+                        buf.writeInt(this.waypoints.size());
+                        for (int wi = 0; wi < this.waypoints.size(); wi++) {
+                            BlockPos wp = this.waypoints.get(wi);
+                            buf.writeInt(wp.getX());
+                            buf.writeInt(wp.getY());
+                            buf.writeInt(wp.getZ());
+                            buf.writeUtf(this.waypointNames.size() > wi ? this.waypointNames.get(wi) : "");
+                        }
+                        buf.writeInt(this.currentWaypointIndex);
                     });
                 }
                 return InteractionResult.SUCCESS;
@@ -443,8 +455,9 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     }
     public void clearWaypoints() { waypoints.clear(); waypointNames.clear(); waypointsView = null; currentWaypointIndex = 0; }
     public BlockPos getCurrentWaypoint() { return waypoints.isEmpty() ? null : waypoints.get(currentWaypointIndex); }
-    public void advanceWaypoint() { if (!waypoints.isEmpty()) currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.size(); }
     public int getCurrentWaypointIndex() { return currentWaypointIndex; }
+    public void setCurrentWaypointIndex(int idx) { this.currentWaypointIndex = Math.max(0, Math.min(idx, Math.max(0, waypoints.size() - 1))); }
+    public void advanceWaypoint() { if (!waypoints.isEmpty()) currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.size(); }
     public boolean isPatrolling() { return entityData.get(PATROLLING); }
     public void setPatrolling(boolean p) { entityData.set(PATROLLING, p); }
     public double getPatrolSpeed() { return patrolSpeed; }
