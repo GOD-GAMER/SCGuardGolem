@@ -32,6 +32,7 @@ public class GolemMenu extends AbstractContainerMenu {
     public static final int TAB_CONFIG = 0;
     public static final int TAB_LOOT = 1;
     public static final int TAB_LISTS = 2;
+    public static final int TAB_WAYPOINTS = 3;
     private int currentTab = TAB_CONFIG;
 
     /** Maximum rows shown in the loot viewport before scrolling kicks in. */
@@ -162,6 +163,24 @@ public class GolemMenu extends AbstractContainerMenu {
                 resized.setItem(i, current.getItem(i));
             g.setLootInventory(resized);
         }
+
+        // Hydrate dwell ticks
+        int dwell = buf.readInt();
+        g.setDwellTicks(dwell);
+
+        // Hydrate waypoints
+        int wpCount = buf.readInt();
+        g.clearWaypoints();
+        for (int i = 0; i < wpCount; i++) {
+            int wx = buf.readInt();
+            int wy = buf.readInt();
+            int wz = buf.readInt();
+            String name = buf.readUtf();
+            g.addWaypoint(new net.minecraft.core.BlockPos(wx, wy, wz), name);
+        }
+        int wpIdx = buf.readInt();
+        g.setCurrentWaypointIndex(wpIdx);
+
         return g;
     }
 
@@ -262,6 +281,28 @@ public class GolemMenu extends AbstractContainerMenu {
             int idx = buttonId - 600;
             List<String> available = getAvailableEntityNames(player);
             if (idx >= 0 && idx < available.size()) golem.addToAttackList(available.get(idx));
+            return true;
+        }
+        // Remove waypoint by index: button IDs 700+
+        if (buttonId >= 700 && buttonId < 800) {
+            int idx = buttonId - 700;
+            golem.removeWaypoint(idx);
+            return true;
+        }
+        // Dwell time: 800 = decrease, 801 = increase
+        if (buttonId == 800) { golem.setDwellTicks(golem.getDwellTicks() - 20); return true; }
+        if (buttonId == 801) { golem.setDwellTicks(golem.getDwellTicks() + 20); return true; }
+        // Remove loot filter entry: button IDs 900+
+        if (buttonId >= 900 && buttonId < 1000) {
+            int idx = buttonId - 900;
+            List<String> filters = new ArrayList<>(golem.getLootFilter());
+            if (idx >= 0 && idx < filters.size()) golem.removeLootFilter(filters.get(idx));
+            return true;
+        }
+        // Add hovered item to loot filter: button ID 1000
+        if (buttonId == 1000) {
+            // The item is passed via the last slot the player shift-clicked
+            // We use the player's cursor item instead
             return true;
         }
         return false;
