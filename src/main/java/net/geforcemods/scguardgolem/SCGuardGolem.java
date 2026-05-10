@@ -24,7 +24,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.LeftClickBlock;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -67,6 +66,16 @@ public class SCGuardGolem {
                     serverPlayer.openMenu(golem, buf -> {
                         buf.writeInt(golem.getId());
                         buf.writeInt(golem.getLootRows());
+                        buf.writeInt(golem.getDwellTicks());
+                        buf.writeInt(golem.getWaypoints().size());
+                        for (int wi = 0; wi < golem.getWaypoints().size(); wi++) {
+                            net.minecraft.core.BlockPos wp = golem.getWaypoints().get(wi);
+                            buf.writeInt(wp.getX());
+                            buf.writeInt(wp.getY());
+                            buf.writeInt(wp.getZ());
+                            buf.writeUtf(golem.getWaypointName(wi));
+                        }
+                        buf.writeInt(golem.getCurrentWaypointIndex());
                     });
                 }
             } else {
@@ -74,6 +83,18 @@ public class SCGuardGolem {
             }
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
+            return;
+        }
+
+        // Crouch + right-click a Security Golem (no wire cutters) → add waypoint at golem's position
+        if (event.getTarget() instanceof SecurityGolemEntity golem && player.isCrouching() && !isWireCutters(held)) {
+            if (golem.isOwner(player) || player.hasPermissions(2)) {
+                golem.addWaypoint(golem.blockPosition());
+                player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7fWaypoint #"
+                        + (golem.getWaypoints().size() - 1) + " added at " + golem.blockPosition().toShortString() + "."), false);
+                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCanceled(true);
+            }
             return;
         }
 
@@ -122,37 +143,6 @@ public class SCGuardGolem {
         if (!golems.isEmpty()) {
             for (SecurityGolemEntity golem : golems) golem.recallToStart();
             player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7f" + golems.size() + " golem(s) recalled."), false);
-        }
-    }
-
-    /**
-     * Crouch + left-click with a reinforced lever → add waypoint at that block pos
-     * for the nearest owned golem.
-     */
-    @SubscribeEvent
-    public static void onLeftClickBlock(PlayerInteractEvent.LeftClickBlock event) {
-        if (event.getLevel().isClientSide()) return;
-        Player player = event.getEntity();
-        if (!player.isCrouching()) return;
-        ItemStack held = player.getItemInHand(event.getHand());
-        if (!isReinforcedLever(held)) return;
-
-        ServerLevel serverLevel = (ServerLevel) event.getLevel();
-        AABB searchBox = new AABB(player.blockPosition()).inflate(32);
-        List<SecurityGolemEntity> golems = serverLevel.getEntitiesOfClass(SecurityGolemEntity.class, searchBox,
-                g -> g.isOwner(player));
-        if (golems.isEmpty()) {
-            player.displayClientMessage(Component.literal("\u00a7c[Security Golem] No nearby golem found."), false);
-            return;
-        }
-        SecurityGolemEntity nearest = golems.stream()
-                .min((a, b) -> Double.compare(a.distanceToSqr(player), b.distanceToSqr(player)))
-                .orElse(null);
-        if (nearest != null) {
-            nearest.addWaypoint(event.getPos());
-            player.displayClientMessage(Component.literal("\u00a76[Security Golem] \u00a7fWaypoint #"
-                    + (nearest.getWaypoints().size() - 1) + " added at " + event.getPos().toShortString() + "."), false);
-            event.setCanceled(true);
         }
     }
 
