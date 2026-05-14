@@ -5,10 +5,10 @@ A **SecurityCraft** addon that adds a configurable **Security Guard Golem** with
 | | |
 |---|---|
 | **Minecraft** | 1.20.4 |
-| **Mod Loader** | NeoForge 20.4.251+ |
+| **Mod Loader** | NeoForge 20.4+ |
 | **SecurityCraft** | 1.9.11+ |
 | **Java** | 21+ |
-| **Mod Version** | 1.3.0 |
+| **Mod Version** | 1.4.0 |
 
 ---
 
@@ -28,11 +28,12 @@ A **SecurityCraft** addon that adds a configurable **Security Guard Golem** with
 - Right-click any vanilla **Iron Golem** with a **SecurityCraft Keycard** to convert it
 - The keycard is consumed and you become the golem's owner
 
-### 3-Tab GUI (Wire Cutters)
+### 4-Tab GUI (Wire Cutters)
 Right-click your golem with **SecurityCraft Wire Cutters** to open the configuration screen:
 - **Config Tab** - Toggle patrol, set threat mode (Warn/Follow/Attack), adjust patrol speed
 - **Loot Tab** - Scrollable inventory (up to 6 rows), requires Storage Module
 - **Lists Tab** - Allow list and Deny list with entity picker
+- **Route Tab** - Manage named patrol waypoints, set dwell time, and reorder the patrol route
 
 ### Module Upgrades (4 Slots)
 
@@ -48,7 +49,10 @@ Right-click your golem with **SecurityCraft Wire Cutters** to open the configura
 Stack count = upgrade level (e.g., 3 Harming modules = level 3).
 
 ### Patrol System
-- Define waypoints via commands or reinforced lever placement
+- Define waypoints via the **Route Tab** in the GUI
+- **Double-crouch while holding Wire Cutters** to instantly add a waypoint at your location
+- Name each waypoint and set a **dwell time** (how long the golem waits before moving on)
+- Remove individual waypoints with the `[x]` button in the Route Tab
 - Golem patrols waypoints in a loop at configurable speed (0.1x - 3.0x)
 
 ### Loot Collection
