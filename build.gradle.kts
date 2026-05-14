@@ -19,6 +19,11 @@ java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 tasks.processResources {
     exclude(".cache")
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    val props = mapOf("version" to modVersion)
+    inputs.properties(props)
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand(props)
+    }
 }
 
 tasks.jar {
