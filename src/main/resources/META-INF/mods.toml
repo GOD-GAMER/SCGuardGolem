@@ -4,7 +4,7 @@ license = "MIT"
 
 [[mods]]
 modId = "scguardgolem"
-version = "${file.jarVersion}"
+version = "${version}"
 displayName = "SecurityCraft Guard Golem"
 description = '''
 A SecurityCraft addon that adds a configurable Security Guard Golem with patrol routes, module-based upgrades, a 3-tab GUI, scrollable loot collection, and player allow/deny lists.
