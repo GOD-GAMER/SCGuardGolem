@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0
+- **Route Tab**: New 4th GUI tab for full waypoint management — add, rename, remove, and reorder patrol waypoints
+- **Named Waypoints**: Each waypoint can be given a custom name displayed in the Route Tab
+- **Dwell Time**: Set how long (in ticks) the golem waits at each waypoint before moving to the next
+- **Double-Crouch Waypoint Placement**: Double-crouch while holding Wire Cutters to instantly add a waypoint at your current position
+- **Remove Button**: Each waypoint entry in the Route Tab has an `[x]` button to delete it
+- **Waypoint Sync**: Route data (positions, names, dwell time, current index) is fully synced to the client on GUI open
+- **Multi-version**: All features ported to MC 1.20.1 (Forge), 1.20.4 (NeoForge), and 1.21.1 (NeoForge)
+
 ## 1.3.0
 - **3-Tab GUI**: Config, Loot, and Lists tabs accessible via Wire Cutters right-click
 - **Scrollable Loot Inventory**: Up to 6 rows with mouse wheel scrolling
