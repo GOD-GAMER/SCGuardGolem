@@ -3,3 +3,10 @@
 *.iml
 .DS_Store
 Thumbs.db
+build/
+run/
+runs/
+*.log
+*.log.gz
+out/
+
