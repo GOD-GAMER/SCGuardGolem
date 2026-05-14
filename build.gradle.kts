@@ -48,6 +48,11 @@ minecraft {
 tasks.processResources {
     exclude(".cache")
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    val props = mapOf("version" to modVersion)
+    inputs.properties(props)
+    filesMatching("META-INF/mods.toml") {
+        expand(props)
+    }
 }
 
 tasks.jar {
