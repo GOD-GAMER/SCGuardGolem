@@ -14,7 +14,7 @@ base {
     version = modVersion
 }
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(17))
 
 minecraft {
     mappings("official", mcVersion)
