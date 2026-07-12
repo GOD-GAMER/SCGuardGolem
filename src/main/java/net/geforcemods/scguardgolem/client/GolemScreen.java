@@ -340,8 +340,8 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         g.text(font, hp, x + 90, statusY, C_DIM, false);
 
         SecurityGolemEntity golem = menu.getGolem();
-        double dmg = 15.0 + golem.getDamageUpgrade() * SecurityGolemEntity.DAMAGE_PER_LEVEL;
-        double spd = 0.25 + golem.getSpeedUpgrade() * SecurityGolemEntity.SPEED_PER_LEVEL;
+        double dmg = golem.hasHarmingModule() ? SecurityGolemEntity.HARMING_ATTACK_DAMAGE : SecurityGolemEntity.BASE_ATTACK_DAMAGE;
+        double spd = golem.hasSpeedModule() ? SecurityGolemEntity.FAST_SPEED : SecurityGolemEntity.BASE_SPEED;
         double det = golem.getEffectiveDetectionRadius();
         g.text(font, String.format("Dmg: %.0f", dmg), x + 8, statusY + 12, C_DIM, false);
         g.text(font, String.format("Spd: %.2f", spd), x + 60, statusY + 12, C_DIM, false);

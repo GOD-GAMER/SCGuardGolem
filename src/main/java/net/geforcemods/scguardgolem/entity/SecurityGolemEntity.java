@@ -13,11 +13,13 @@ import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import net.geforcemods.securitycraft.api.IModuleInventory;
 import net.geforcemods.securitycraft.api.IOwnable;
 import net.geforcemods.securitycraft.api.Owner;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -59,7 +61,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable, IModuleInventory {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
@@ -73,20 +75,21 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> ATTACK_LIST_DATA =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
-    // Module slots
-    public static final int MODULE_SLOTS = 4;
-    public static final int SLOT_HARMING = 0;
-    public static final int SLOT_SPEED = 1;
-    public static final int SLOT_SMART = 2;
-    public static final int SLOT_STORAGE = 3;
+    // SecurityCraft module inventory (api.IModuleInventory). Modules are BINARY —
+    // present = full effect; SC modules don't stack (b3 adds ALLOWLIST/DENYLIST here).
+    public static final ModuleType[] ACCEPTED_MODULES = {
+        ModuleType.HARMING, ModuleType.SPEED, ModuleType.SMART, ModuleType.STORAGE
+    };
+    public static final int MODULE_SLOTS = ACCEPTED_MODULES.length;
 
-    public static final int MAX_UPGRADE_LEVEL = 5;
     public static final int MAX_LOOT_ROWS = 6;
     public static final int BASE_LOOT_SLOTS = 9;
     public static final double BASE_DETECTION_RADIUS = 16.0;
-    public static final double DETECTION_RADIUS_PER_LEVEL = 4.0;
-    public static final double DAMAGE_PER_LEVEL = 3.0;
-    public static final double SPEED_PER_LEVEL = 0.03;
+    public static final double SMART_DETECTION_RADIUS = 32.0;
+    public static final double BASE_ATTACK_DAMAGE = 15.0;
+    public static final double HARMING_ATTACK_DAMAGE = 25.0;
+    public static final double BASE_SPEED = 0.25;
+    public static final double FAST_SPEED = 0.35;
 
     private final SimpleContainer moduleInventory = new SimpleContainer(MODULE_SLOTS) {
         @Override
@@ -97,12 +100,12 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         //? if >=1.21.1 {
         @Override
         public int getMaxStackSize(ItemStack stack) {
-            return MAX_UPGRADE_LEVEL;
+            return 1;
         }
         //?} else {
         /*@Override
         public int getMaxStackSize() {
-            return MAX_UPGRADE_LEVEL;
+            return 1;
         }
         *///?}
     };
@@ -306,29 +309,48 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         return isOwnedBy(player, false);
     }
 
-    // -- Module Inventory --
+    // -- Module Inventory (api.IModuleInventory) --
+    /** The backing SimpleContainer (GUI slots + save/load use this; getInventory() is a view of it). */
     public SimpleContainer getModuleInventory() { return moduleInventory; }
 
-    public int getModuleCount(int slot) {
-        ItemStack stack = moduleInventory.getItem(slot);
-        return stack.isEmpty() ? 0 : Math.min(stack.getCount(), MAX_UPGRADE_LEVEL);
+    @Override
+    public NonNullList<ItemStack> getInventory() {
+        // Read-only view for SecurityCraft. Nothing writes through getInventory():
+        // the GUI edits the SimpleContainer via slots; getModule/isAllowed only read.
+        NonNullList<ItemStack> view = NonNullList.withSize(moduleInventory.getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++)
+            view.set(i, moduleInventory.getItem(i));
+        return view;
     }
 
-    public static ModuleType getExpectedModuleType(int slot) {
-        return switch (slot) {
-            case SLOT_HARMING -> ModuleType.HARMING;
-            case SLOT_SPEED -> ModuleType.SPEED;
-            case SLOT_SMART -> ModuleType.SMART;
-            case SLOT_STORAGE -> ModuleType.STORAGE;
-            default -> null;
-        };
-    }
+    @Override
+    public ModuleType[] acceptedModules() { return ACCEPTED_MODULES; }
 
+    @Override
+    public boolean isModuleEnabled(ModuleType module) { return !getModule(module).isEmpty(); }
+
+    @Override
+    public void toggleModuleState(ModuleType module, boolean shouldBeEnabled) {}
+
+    @Override
+    public Level myLevel() { return level(); }
+
+    @Override
+    public BlockPos myPos() { return blockPosition(); }
+
+    // IModuleInventory's insert/remove defaults dirty a BlockEntity (no-op on an entity),
+    // so reapply effects here instead.
+    @Override
+    public void onModuleInserted(ItemStack stack, ModuleType module, boolean toggled) { onModulesChanged(); }
+
+    @Override
+    public void onModuleRemoved(ItemStack stack, ModuleType module, boolean toggled) { onModulesChanged(); }
+
+    /** A config slot accepts a ModuleItem whose type matches acceptedModules()[index]. */
     public static boolean isValidModuleForSlot(int slot, ItemStack stack) {
         if (stack.isEmpty()) return true;
         if (!(stack.getItem() instanceof ModuleItem moduleItem)) return false;
-        ModuleType expected = getExpectedModuleType(slot);
-        return expected != null && moduleItem.getModuleType() == expected;
+        return slot >= 0 && slot < ACCEPTED_MODULES.length && moduleItem.getModuleType() == ACCEPTED_MODULES[slot];
     }
 
     private void onModulesChanged() {
@@ -340,17 +362,18 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         }
     }
 
-    // -- Module-driven upgrades --
-    public int getDamageUpgrade() { return getModuleCount(SLOT_HARMING); }
-    public int getSpeedUpgrade() { return getModuleCount(SLOT_SPEED); }
-    public int getDetectionUpgrade() { return getModuleCount(SLOT_SMART); }
-    public double getEffectiveDetectionRadius() { return BASE_DETECTION_RADIUS + getDetectionUpgrade() * DETECTION_RADIUS_PER_LEVEL; }
+    // -- Module-driven effects (binary: present = full effect) --
+    public boolean hasHarmingModule() { return isModuleEnabled(ModuleType.HARMING); }
+    public boolean hasSpeedModule()   { return isModuleEnabled(ModuleType.SPEED); }
+    public boolean hasSmartModule()   { return isModuleEnabled(ModuleType.SMART); }
+    public boolean hasStorageModule() { return isModuleEnabled(ModuleType.STORAGE); }
+    public double getEffectiveDetectionRadius() { return hasSmartModule() ? SMART_DETECTION_RADIUS : BASE_DETECTION_RADIUS; }
 
     private void applyUpgrades() {
         AttributeInstance a = getAttribute(Attributes.ATTACK_DAMAGE);
-        if (a != null) a.setBaseValue(15.0D + getDamageUpgrade() * DAMAGE_PER_LEVEL);
+        if (a != null) a.setBaseValue(hasHarmingModule() ? HARMING_ATTACK_DAMAGE : BASE_ATTACK_DAMAGE);
         AttributeInstance s = getAttribute(Attributes.MOVEMENT_SPEED);
-        if (s != null) s.setBaseValue(0.25D + getSpeedUpgrade() * SPEED_PER_LEVEL);
+        if (s != null) s.setBaseValue(hasSpeedModule() ? FAST_SPEED : BASE_SPEED);
     }
 
     // -- Name-based allow/deny lists --
@@ -405,9 +428,8 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     public void setLootInventory(SimpleContainer inv) { this.lootInventory = inv; }
 
     public int getLootSlotCount() {
-        int storageLevel = getModuleCount(SLOT_STORAGE);
-        int rows = 1 + storageLevel;
-        return Math.min(rows, MAX_LOOT_ROWS) * 9;
+        int rows = hasStorageModule() ? MAX_LOOT_ROWS : 1;
+        return rows * 9;
     }
 
     public int getLootRows() {
@@ -449,7 +471,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
 
     // -- Item Pickup --
     private void pickupNearbyItems() {
-        if (getModuleCount(SLOT_STORAGE) <= 0) return;
+        if (!hasStorageModule()) return;
         AABB pickupBox = getBoundingBox().inflate(2.0);
         List<ItemEntity> items = level().getEntitiesOfClass(ItemEntity.class, pickupBox);
         for (ItemEntity itemEntity : items) {

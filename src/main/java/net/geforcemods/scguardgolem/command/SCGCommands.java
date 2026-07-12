@@ -183,7 +183,10 @@ public class SCGCommands {
                 + " \u00a7f| Speed: \u00a7e" + String.format("%.2f", g.getPatrolSpeed()));
         msg(ctx, "Threat Mode: \u00a7e" + g.getThreatMode().name());
         msg(ctx, "Detection Radius: \u00a7e" + String.format("%.1f", g.getEffectiveDetectionRadius()) + " blocks");
-        msg(ctx, "Modules \u2014 DMG:\u00a7e" + g.getDamageUpgrade() + "\u00a7f SPD:\u00a7e" + g.getSpeedUpgrade() + "\u00a7f DET:\u00a7e" + g.getDetectionUpgrade());
+        msg(ctx, "Modules \u2014 Harming:\u00a7e" + (g.hasHarmingModule() ? "yes" : "no")
+                + "\u00a7f Speed:\u00a7e" + (g.hasSpeedModule() ? "yes" : "no")
+                + "\u00a7f Smart:\u00a7e" + (g.hasSmartModule() ? "yes" : "no")
+                + "\u00a7f Storage:\u00a7e" + (g.hasStorageModule() ? "yes" : "no"));
         Set<String> ignore = g.getIgnoreListNames();
         Set<String> attack = g.getAlwaysAttackListNames();
         msg(ctx, "Ignore: \u00a77" + (ignore.isEmpty() ? "(empty)" : String.join(", ", ignore)));
