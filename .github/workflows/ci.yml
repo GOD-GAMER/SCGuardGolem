@@ -68,8 +68,13 @@ jobs:
         timeout-minutes: 30
 
       # ---- RUNG 3: RUN — gametest smoke suite. Exit code = number of failed
-      # required gametests (0 = pass).
-      - name: "Rung 3: gametests"
+      # required gametests (0 = pass). The cross-version smoke test (convert a
+      # golem, open the GUI, assert the manual page is registered) lands with the
+      # phase (b) feature port; until then gameTestServer has no tests to run and
+      # would crash, so this rung is non-blocking. Flip continue-on-error off once
+      # the gametest exists to make it a hard gate.
+      - name: "Rung 3: gametests (non-blocking until phase b)"
+        continue-on-error: true
         run: |
           mkdir -p "versions/${{ matrix.target }}/run/gameTestServer"
           echo "eula=true" > "versions/${{ matrix.target }}/run/gameTestServer/eula.txt"

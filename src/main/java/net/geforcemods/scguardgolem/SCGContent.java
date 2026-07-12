@@ -108,9 +108,12 @@ public class SCGContent {
             MENU_TYPES.register("golem_menu", () -> IMenuTypeExtension.create(GolemMenu::new));
     //?}
 
-    // Manual item. Pre-1.20.5 has no data components — the written-book pages
-    // are attached via NBT inside the item (see SCGManualItem). This whole item
-    // is replaced by a native SecurityCraft SCManualPage in a later phase.
+    // Manual item. Divergences across the range:
+    //  - pre-1.20.5: no data components; pages attach via item NBT (SCGManualItem).
+    //  - MC 1.21.2+: Item.Properties must carry a registry id (setId), else the
+    //    generic DeferredRegister path throws "Item id not set" at registration.
+    //    (Boundary written as 1.21.8 to match this matrix; no 1.21.2-1.21.7 target.)
+    // This whole item is replaced by a native SecurityCraft SCManualPage later.
     //? if forge {
     /*public static final RegistryObject<SCGManualItem> SCG_MANUAL =
             ITEMS.register("scg_manual", () ->
@@ -119,10 +122,18 @@ public class SCGContent {
     /*public static final DeferredHolder<Item, SCGManualItem> SCG_MANUAL =
             ITEMS.register("scg_manual", () ->
                     new SCGManualItem(new Item.Properties().stacksTo(1)));
+    *///?} elif <1.21.8 {
+    /*public static final DeferredHolder<Item, SCGManualItem> SCG_MANUAL =
+            ITEMS.register("scg_manual", () ->
+                    new SCGManualItem(new Item.Properties().stacksTo(1)
+                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
+                                    SCGManualItem.buildManualContent())));
     *///?} else {
     public static final DeferredHolder<Item, SCGManualItem> SCG_MANUAL =
             ITEMS.register("scg_manual", () ->
                     new SCGManualItem(new Item.Properties().stacksTo(1)
+                            .setId(ResourceKey.create(Registries.ITEM,
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "scg_manual")))
                             .component(DataComponents.WRITTEN_BOOK_CONTENT,
                                     SCGManualItem.buildManualContent())));
     //?}
