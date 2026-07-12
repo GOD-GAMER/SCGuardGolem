@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main, rebuild]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The build matrix is generated from versions.matrix.toml — CI never
+  # hand-maintains a target list.
+  matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.gen.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gen
+        shell: python
+        run: |
+          import re, os, json
+          targets = re.findall(r'^\[targets\."([^"]+)"\]', open('versions.matrix.toml', encoding='utf-8').read(), re.M)
+          assert targets, 'versions.matrix.toml defined no targets'
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              f.write('targets=' + json.dumps(targets) + '\n')
+
+  verify:
+    needs: matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.matrix.outputs.targets) }}
+    name: "${{ matrix.target }}"
+    steps:
+      - uses: actions/checkout@v4
+
+      # The repo once shipped a corrupted gradlew that silently dropped all
+      # arguments. Never again.
+      - uses: gradle/actions/wrapper-validation@v4
+
+      # All three toolchains; per-target selection happens via Gradle
+      # toolchains (versions.matrix.toml `java`), daemon runs on 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+            25
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # ---- RUNG 1: COMPILE against the pinned SecurityCraft + loader ----
+      - name: "Rung 1: compile"
+        run: ./gradlew ":${{ matrix.target }}:build" --console=plain --stacktrace
+        timeout-minutes: 40
+
+      # ---- RUNG 2: LOAD — boot a dedicated server so the loader validates
+      # the generated dependency ranges against the real artifacts. `stop` is
+      # consumed once the console thread is up, i.e. after mod load completed.
+      # A range mismatch or mod-load error exits non-zero and fails the step.
+      - name: "Rung 2: server boot"
+        run: |
+          mkdir -p "versions/${{ matrix.target }}/run/server"
+          echo "eula=true" > "versions/${{ matrix.target }}/run/server/eula.txt"
+          echo "stop" | ./gradlew ":${{ matrix.target }}:runServer" --console=plain
+        timeout-minutes: 30
+
+      # ---- RUNG 3: RUN — gametest smoke suite. Exit code = number of failed
+      # required gametests (0 = pass).
+      - name: "Rung 3: gametests"
+        run: |
+          mkdir -p "versions/${{ matrix.target }}/run/gameTestServer"
+          echo "eula=true" > "versions/${{ matrix.target }}/run/gameTestServer/eula.txt"
+          ./gradlew ":${{ matrix.target }}:runGameTestServer" --console=plain
+        timeout-minutes: 30
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: "SCGuardGolem-${{ matrix.target }}"
+          path: versions/${{ matrix.target }}/build/libs/*.jar
+          if-no-files-found: error

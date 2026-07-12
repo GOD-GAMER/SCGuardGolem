@@ -1,11 +1,11 @@
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.language.jvm.tasks.ProcessResources
 
-// Central per-node build script for every NEOFORGE target (the Forge 1.20.1
-// node uses build.forge.gradle.kts). The node's project name IS the target
-// name in versions.matrix.toml; all version data comes from that file.
+// Node build script for the single FORGE target (1.20.1), using ModDevGradle
+// Legacy. Kept intentionally parallel to build.gradle.kts; shared logic lives
+// in buildSrc (ScgMatrix).
 plugins {
-    id("net.neoforged.moddev") // version pinned in stonecutter.gradle.kts
+    id("net.neoforged.moddev.legacyforge") // version pinned in stonecutter.gradle.kts
     id("neoforge-mutex")
 }
 
@@ -28,22 +28,23 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(m.getValue("java").toInt())
 }
 
-neoForge {
-    version = m.getValue("loader_min")
+legacyForge {
+    // "<mcVersion>-<forgeVersion>"
+    version = "$target-${m.getValue("loader_min")}"
 
     runs {
         register("client") {
             client()
-            systemProperty("neoforge.enabledGameTestNamespaces", "scguardgolem")
+            systemProperty("forge.enabledGameTestNamespaces", "scguardgolem")
         }
         register("server") {
             server()
             programArgument("-nogui")
-            systemProperty("neoforge.enabledGameTestNamespaces", "scguardgolem")
+            systemProperty("forge.enabledGameTestNamespaces", "scguardgolem")
         }
         register("gameTestServer") {
             type = "gameTestServer"
-            systemProperty("neoforge.enabledGameTestNamespaces", "scguardgolem")
+            systemProperty("forge.enabledGameTestNamespaces", "scguardgolem")
         }
         configureEach {
             gameDirectory = file("run/$name")
@@ -64,17 +65,15 @@ repositories {
 }
 
 dependencies {
-    // Pinned published SecurityCraft build for this target (see versions.matrix.toml).
-    // implementation => on the compile classpath AND loaded as a mod in dev runs.
-    implementation(ScgMatrix.securityCraftCoordinate(matrixShared, m))
+    // Forge 1.20.1 release jars are SRG-obfuscated; modImplementation is MDG
+    // Legacy's auto-created remapping configuration (the fg.deobf successor).
+    "modImplementation"(ScgMatrix.securityCraftCoordinate(matrixShared, m))
 }
 
-// MDG must decompile/patch against the Stonecutter-generated sources.
 tasks.matching { it.name == "createMinecraftArtifacts" }.configureEach {
     dependsOn("stonecutterGenerate")
 }
 
-// Allow `echo stop | gradlew :<target>:runServer` for the CI LOAD rung.
 tasks.matching { it.name == "runServer" }.configureEach {
     if (this is JavaExec) standardInput = System.`in`
 }
@@ -91,8 +90,6 @@ tasks.named<Jar>("jar") {
     }
 }
 
-// Generated metadata: ONE template, tokens computed from the matrix. The
-// declared lower bounds are by construction the versions compiled against.
 val metaTokens = ScgMatrix.metadataTokens(m, modVersion)
 
 tasks.named<ProcessResources>("processResources") {
