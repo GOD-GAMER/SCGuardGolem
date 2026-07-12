@@ -13,6 +13,8 @@ import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import net.geforcemods.securitycraft.api.IOwnable;
+import net.geforcemods.securitycraft.api.Owner;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
 import net.minecraft.core.BlockPos;
@@ -48,6 +50,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 //? if >=1.21.8 {
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -56,14 +59,14 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem implements MenuProvider {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<String> OWNER_UUID =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
-    private static final EntityDataAccessor<String> OWNER_NAME =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
+    // SecurityCraft Owner, synced to the client via its own EntityDataSerializer
+    // (present on every SC version). Replaces the old owner-UUID/name string pair.
+    private static final EntityDataAccessor<Owner> OWNER =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, Owner.getSerializer());
     private static final EntityDataAccessor<Integer> THREAT_MODE =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<String> IGNORE_LIST_DATA =
@@ -150,8 +153,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(PATROLLING, false);
-        builder.define(OWNER_UUID, "");
-        builder.define(OWNER_NAME, "");
+        builder.define(OWNER, new Owner());
         builder.define(THREAT_MODE, ThreatMode.WARN.ordinal());
         builder.define(IGNORE_LIST_DATA, "");
         builder.define(ATTACK_LIST_DATA, "");
@@ -161,8 +163,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     protected void defineSynchedData() {
         super.defineSynchedData();
         entityData.define(PATROLLING, false);
-        entityData.define(OWNER_UUID, "");
-        entityData.define(OWNER_NAME, "");
+        entityData.define(OWNER, new Owner());
         entityData.define(THREAT_MODE, ThreatMode.WARN.ordinal());
         entityData.define(IGNORE_LIST_DATA, "");
         entityData.define(ATTACK_LIST_DATA, "");
@@ -278,22 +279,31 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         return InteractionResult.PASS;
     }
 
-    // -- Owner --
+    // -- Owner (SecurityCraft api.IOwnable) --
     public void setGolemOwner(Player player) {
-        //? if >=1.21.10 {
-        entityData.set(OWNER_UUID, player.getGameProfile().id().toString());
-        //?} else
-        /*entityData.set(OWNER_UUID, player.getGameProfile().getId().toString());*/
-        entityData.set(OWNER_NAME, player.getName().getString());
+        entityData.set(OWNER, new Owner(player));
     }
-    public String getOwnerUUID() { return entityData.get(OWNER_UUID); }
-    public String getOwnerName() { return entityData.get(OWNER_NAME); }
+
+    @Override
+    public Owner getOwner() {
+        return entityData.get(OWNER);
+    }
+
+    @Override
+    public void setOwner(String uuid, String name) {
+        entityData.set(OWNER, new Owner(name, uuid));
+    }
+
+    // The IOwnable default casts `this` to BlockEntity; this is an entity, so no-op (Sentry does the same).
+    @Override
+    public void onOwnerChanged(BlockState state, Level level, BlockPos pos, Player player, Owner oldOwner, Owner newOwner) {}
+
+    public String getOwnerUUID() { return getOwner().getUUID(); }
+    public String getOwnerName() { return getOwner().getName(); }
+
+    /** Owner check that also honours SecurityCraft teams (via IOwnable#isOwnedBy). */
     public boolean isOwner(Player player) {
-        String uuid = getOwnerUUID();
-        //? if >=1.21.10 {
-        return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
-        //?} else
-        /*return !uuid.isEmpty() && uuid.equals(player.getGameProfile().getId().toString());*/
+        return isOwnedBy(player, false);
     }
 
     // -- Module Inventory --
@@ -580,8 +590,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     @Override
     public void addAdditionalSaveData(ValueOutput tag) {
         super.addAdditionalSaveData(tag);
-        tag.putString("GolemOwnerUUID", getOwnerUUID());
-        tag.putString("GolemOwnerName", getOwnerName());
+        tag.store("GolemOwner", Owner.CODEC, getOwner());
         tag.putBoolean("Patrolling", isPatrolling());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
@@ -625,8 +634,13 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     @Override
     public void readAdditionalSaveData(ValueInput tag) {
         super.readAdditionalSaveData(tag);
-        entityData.set(OWNER_UUID, tag.getStringOr("GolemOwnerUUID", ""));
-        entityData.set(OWNER_NAME, tag.getStringOr("GolemOwnerName", ""));
+        Owner golemOwner = tag.read("GolemOwner", Owner.CODEC).orElse(null);
+        if (golemOwner == null) { // migrate legacy owner-string save data
+            String legacyUuid = tag.getStringOr("GolemOwnerUUID", "");
+            golemOwner = legacyUuid.isEmpty() ? new Owner()
+                    : new Owner(tag.getStringOr("GolemOwnerName", ""), legacyUuid);
+        }
+        entityData.set(OWNER, golemOwner);
         entityData.set(PATROLLING, tag.getBooleanOr("Patrolling", false));
         patrolSpeed = tag.getDoubleOr("PatrolSpeed", 1.0);
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
@@ -678,8 +692,9 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     /*@Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putString("GolemOwnerUUID", getOwnerUUID());
-        tag.putString("GolemOwnerName", getOwnerName());
+        CompoundTag golemOwnerTag = new CompoundTag();
+        getOwner().save(golemOwnerTag, true);
+        tag.put("GolemOwner", golemOwnerTag);
         tag.putBoolean("Patrolling", isPatrolling());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
@@ -772,8 +787,9 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     /*@Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putString("GolemOwnerUUID", getOwnerUUID());
-        tag.putString("GolemOwnerName", getOwnerName());
+        CompoundTag golemOwnerTag = new CompoundTag();
+        getOwner().save(golemOwnerTag, true);
+        tag.put("GolemOwner", golemOwnerTag);
         tag.putBoolean("Patrolling", isPatrolling());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
@@ -869,8 +885,13 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     /** Shared CompoundTag reads for the pre-1.21.8 load paths. */
     //? if <1.21.8 {
     /*private void readCommonTag(CompoundTag tag) {
-        entityData.set(OWNER_UUID, tag.getString("GolemOwnerUUID"));
-        entityData.set(OWNER_NAME, tag.getString("GolemOwnerName"));
+        CompoundTag golemOwnerTag = tag.getCompound("GolemOwner");
+        if (!golemOwnerTag.isEmpty()) entityData.set(OWNER, Owner.fromCompound(golemOwnerTag));
+        else { // migrate legacy owner-string save data
+            String legacyUuid = tag.getString("GolemOwnerUUID");
+            entityData.set(OWNER, legacyUuid.isEmpty() ? new Owner()
+                    : new Owner(tag.getString("GolemOwnerName"), legacyUuid));
+        }
         entityData.set(PATROLLING, tag.getBoolean("Patrolling"));
         patrolSpeed = tag.contains("PatrolSpeed") ? tag.getDouble("PatrolSpeed") : 1.0;
         currentWaypointIndex = tag.getInt("CurrentWaypointIndex");
