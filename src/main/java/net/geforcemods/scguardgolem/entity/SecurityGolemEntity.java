@@ -12,9 +12,11 @@ import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import net.geforcemods.securitycraft.api.IEMPAffected;
 import net.geforcemods.securitycraft.api.IModuleInventory;
 import net.geforcemods.securitycraft.api.IOwnable;
 import net.geforcemods.securitycraft.api.Owner;
+import net.geforcemods.securitycraft.api.SecurityCraftAPI;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
 import net.minecraft.core.BlockPos;
@@ -60,9 +62,11 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable, IModuleInventory {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable, IModuleInventory, IEMPAffected {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> SHUT_DOWN =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
     // SecurityCraft Owner, synced to the client via its own EntityDataSerializer
     // (present on every SC version). Replaces the old owner-UUID/name string pair.
@@ -149,6 +153,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(PATROLLING, false);
+        builder.define(SHUT_DOWN, false);
         builder.define(OWNER, new Owner());
         builder.define(THREAT_MODE, ThreatMode.WARN.ordinal());
     }
@@ -157,6 +162,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     protected void defineSynchedData() {
         super.defineSynchedData();
         entityData.define(PATROLLING, false);
+        entityData.define(SHUT_DOWN, false);
         entityData.define(OWNER, new Owner());
         entityData.define(THREAT_MODE, ThreatMode.WARN.ordinal());
     }
@@ -176,13 +182,39 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         //? if >=1.21.8 {
         this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
                 net.minecraft.world.entity.Mob.class, 5, false, false,
-                (entity, level) -> entity instanceof Enemy && !(entity instanceof Creeper)));
+                (entity, level) -> isHostileThreat(entity)));
         //?} else {
         /*this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
                 net.minecraft.world.entity.Mob.class, 5, false, false,
-                entity -> entity instanceof Enemy && !(entity instanceof Creeper)));
+                entity -> isHostileThreat(entity)));
         *///?}
     }
+
+    /**
+     * A hostile threat is any Enemy (bar Creepers) OR anything another mod registered
+     * as sentry-attackable via SecurityCraft IMC — so the golem's threat logic stays
+     * consistent with the Sentry and respects other addons' rules.
+     */
+    public boolean isHostileThreat(net.minecraft.world.entity.Entity entity) {
+        if (isShutDown()) return false;
+        if (entity instanceof Creeper) return false;
+        if (entity instanceof Enemy) return true;
+        return SecurityCraftAPI.getRegisteredSentryAttackTargetChecks().stream()
+                .anyMatch(check -> check.canAttack(entity));
+    }
+
+    // -- IEMPAffected (responds to SecurityCraft EMP like the Sentry) --
+    @Override
+    public void shutDown() {
+        IEMPAffected.super.shutDown();
+        setTarget(null);
+    }
+
+    @Override
+    public boolean isShutDown() { return entityData.get(SHUT_DOWN); }
+
+    @Override
+    public void setShutDown(boolean shutDown) { entityData.set(SHUT_DOWN, shutDown); }
 
     @Override
     public void tick() {
@@ -200,6 +232,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     /** Track target acquisition so PatrolGoal can resume at saved waypoint after combat. */
     @Override
     public void setTarget(net.minecraft.world.entity.LivingEntity target) {
+        if (isShutDown()) { super.setTarget(null); return; } // EMP'd golems don't fight
         boolean hadNoTarget = this.getTarget() == null;
         super.setTarget(target);
         if (!level().isClientSide()) {
@@ -259,6 +292,15 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
+            // Reactivate an EMP-disabled golem with redstone (the Sentry pattern).
+            if (isShutDown() && player.getItemInHand(hand).getItem() == net.minecraft.world.item.Items.REDSTONE) {
+                if (SCGuardGolem.canConfigure(this, player)) {
+                    reactivate();
+                    if (!player.isCreative()) player.getItemInHand(hand).shrink(1);
+                    return InteractionResult.SUCCESS;
+                }
+                return InteractionResult.PASS;
+            }
             if (SCGuardGolem.canConfigure(this, player)) {
                 if (player instanceof ServerPlayer serverPlayer) {
                     SCGuardGolem.openGolemMenu(serverPlayer, this);
@@ -562,6 +604,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         super.addAdditionalSaveData(tag);
         tag.store("GolemOwner", Owner.CODEC, getOwner());
         tag.putBoolean("Patrolling", isPatrolling());
+        tag.putBoolean("ShutDown", isShutDown());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
@@ -603,6 +646,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         }
         entityData.set(OWNER, golemOwner);
         entityData.set(PATROLLING, tag.getBooleanOr("Patrolling", false));
+        entityData.set(SHUT_DOWN, tag.getBooleanOr("ShutDown", false));
         patrolSpeed = tag.getDoubleOr("PatrolSpeed", 1.0);
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
         entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
@@ -647,6 +691,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         getOwner().save(golemOwnerTag, true);
         tag.put("GolemOwner", golemOwnerTag);
         tag.putBoolean("Patrolling", isPatrolling());
+        tag.putBoolean("ShutDown", isShutDown());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
@@ -733,6 +778,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         getOwner().save(golemOwnerTag, true);
         tag.put("GolemOwner", golemOwnerTag);
         tag.putBoolean("Patrolling", isPatrolling());
+        tag.putBoolean("ShutDown", isShutDown());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
@@ -826,6 +872,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
                     : new Owner(tag.getString("GolemOwnerName"), legacyUuid));
         }
         entityData.set(PATROLLING, tag.getBoolean("Patrolling"));
+        entityData.set(SHUT_DOWN, tag.getBoolean("ShutDown"));
         patrolSpeed = tag.contains("PatrolSpeed") ? tag.getDouble("PatrolSpeed") : 1.0;
         currentWaypointIndex = tag.getInt("CurrentWaypointIndex");
         entityData.set(THREAT_MODE, tag.contains("ThreatMode") ? tag.getInt("ThreatMode") : ThreatMode.WARN.ordinal());

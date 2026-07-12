@@ -22,7 +22,7 @@ public class BadgeCheckGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        return golem.isScanTick() && golem.getTarget() == null;
+        return !golem.isShutDown() && golem.isScanTick() && golem.getTarget() == null;
     }
 
     @Override

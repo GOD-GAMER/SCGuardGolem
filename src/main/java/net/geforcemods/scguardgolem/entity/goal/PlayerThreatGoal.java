@@ -27,6 +27,7 @@ public class PlayerThreatGoal extends TargetGoal {
 
     @Override
     public boolean canUse() {
+        if (golem.isShutDown()) return false;
         if (golem.getThreatMode() == ThreatMode.WARN) return false;
         if (!golem.isScanTick()) return targetPlayer != null;
         LivingEntity current = golem.getTarget();

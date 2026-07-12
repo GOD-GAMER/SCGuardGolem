@@ -29,11 +29,14 @@ import net.minecraft.world.level.block.BellBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.geforcemods.securitycraft.api.SecurityCraftAPI;
 //? if forge {
 /*import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.InterModComms;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
@@ -42,7 +45,9 @@ import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 /*import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
+import net.neoforged.fml.InterModComms;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.TickEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -50,8 +55,10 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
+import net.neoforged.fml.InterModComms;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -88,15 +95,23 @@ public class SCGuardGolem {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
+        modBus.addListener(SCGuardGolem::onInterModEnqueue);
         LOGGER.info("SecurityCraft Guard Golem addon initialized");
     }
     *///?} else {
     public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
+        modBus.addListener(SCGuardGolem::onInterModEnqueue);
         LOGGER.info("SecurityCraft Guard Golem addon initialized");
     }
     //?}
+
+    /** Register the golem's threat rule with SecurityCraft's sentry-target registry. */
+    public static void onInterModEnqueue(InterModEnqueueEvent event) {
+        if (!scLoaded) return;
+        InterModComms.sendTo("securitycraft", SecurityCraftAPI.IMC_SENTRY_ATTACK_TARGET_MSG, GolemAttackTargetCheck::new);
+    }
 
     /**
      * Sends a chat message to a player. Player#sendSystemMessage does not exist

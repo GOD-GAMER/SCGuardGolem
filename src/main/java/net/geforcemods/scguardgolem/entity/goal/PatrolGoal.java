@@ -23,7 +23,7 @@ public class PatrolGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        return golem.isPatrolling() && !golem.getWaypoints().isEmpty() && golem.getTarget() == null;
+        return !golem.isShutDown() && golem.isPatrolling() && !golem.getWaypoints().isEmpty() && golem.getTarget() == null;
     }
 
     @Override
