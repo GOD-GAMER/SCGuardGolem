@@ -11,7 +11,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.LivingEntity;
+//? if >=1.20.5 {
 import net.minecraft.network.RegistryFriendlyByteBuf;
+//?} else
+/*import net.minecraft.network.FriendlyByteBuf;*/
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -142,16 +145,25 @@ public class GolemMenu extends AbstractContainerMenu {
     }
 
     /** Client-side factory — reads entity ID + lootRows from the network buffer. */
+    //? if >=1.20.5 {
     public GolemMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         this(containerId, playerInv, prepareGolemFromBuf(playerInv, buf));
     }
+    //?} else {
+    /*public GolemMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
+        this(containerId, playerInv, prepareGolemFromBuf(playerInv, buf));
+    }
+    *///?}
 
     /**
      * Reads the buffer written by {@code SecurityGolemEntity.writeClientSideData},
      * finds the entity on the client, and ensures its loot container is correctly
      * sized (the client-side entity hasn't run {@code resizeLootInventory}).
      */
+    //? if >=1.20.5
     private static SecurityGolemEntity prepareGolemFromBuf(Inventory playerInv, RegistryFriendlyByteBuf buf) {
+    //? if <1.20.5
+    /*private static SecurityGolemEntity prepareGolemFromBuf(Inventory playerInv, FriendlyByteBuf buf) {*/
         int entityId = buf.readInt();
         int serverLootRows = buf.readInt();
         // Waypoints

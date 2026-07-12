@@ -3,24 +3,28 @@ package net.geforcemods.scguardgolem.item;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import net.minecraft.server.network.Filterable;
 import net.minecraft.stats.Stats;
 import net.minecraft.world.InteractionHand;
+//? if >=1.21.8
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
 
+// NOTE: this whole item is throwaway — a later phase replaces it with a native
+// SecurityCraft SCManualPage. The page CONTENT below is shared across all MC
+// versions; only how the pages are attached differs: a WrittenBookContent data
+// component on MC >= 1.20.5, item NBT on the pre-component 1.20.x line.
 public class SCGManualItem extends Item {
 
     public SCGManualItem(Item.Properties properties) {
         super(properties);
     }
 
+    //? if >=1.21.8 {
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
@@ -28,15 +32,51 @@ public class SCGManualItem extends Item {
         player.awardStat(Stats.ITEM_USED.get(this));
         return InteractionResult.SUCCESS;
     }
+    //?} else {
+    /*@Override
+    public net.minecraft.world.InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        ensureBookTag(stack);
+        player.openItemGui(stack, hand);
+        player.awardStat(Stats.ITEM_USED.get(this));
+        return net.minecraft.world.InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+    }
+    *///?}
 
-    public static WrittenBookContent buildManualContent() {
+    /** Pre-1.20.5: attach the book pages as item NBT. No-op once data components exist. */
+    private static void ensureBookTag(ItemStack stack) {
+        //? if <1.20.5 {
+        /*if (stack.hasTag() && stack.getTag().contains("pages")) return;
+        net.minecraft.nbt.CompoundTag tag = stack.getOrCreateTag();
+        tag.putString("title", "Security Golem Manual");
+        tag.putString("author", "SCGuardGolem");
+        tag.putBoolean("resolved", true);
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        for (Component page : manualPages())
+            list.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(page)));
+        tag.put("pages", list);
+        *///?}
+    }
+
+    //? if >=1.20.5 {
+    /** MC >= 1.20.5: the pages as a WrittenBookContent data component. */
+    public static net.minecraft.world.item.component.WrittenBookContent buildManualContent() {
+        List<net.minecraft.server.network.Filterable<Component>> pages =
+                manualPages().stream().map(net.minecraft.server.network.Filterable::passThrough).toList();
+        return new net.minecraft.world.item.component.WrittenBookContent(
+                net.minecraft.server.network.Filterable.passThrough("Security Golem Manual"),
+                "SCGuardGolem", 0, pages, true);
+    }
+    //?}
+
+    private static List<Component> manualPages() {
         Style header = Style.EMPTY.withBold(true).withColor(ChatFormatting.DARK_AQUA);
         Style cmd = Style.EMPTY.withColor(ChatFormatting.DARK_GREEN);
         Style body = Style.EMPTY.withColor(ChatFormatting.BLACK);
         Style dim = Style.EMPTY.withColor(ChatFormatting.GRAY);
         Style highlight = Style.EMPTY.withColor(ChatFormatting.GOLD);
 
-        List<Filterable<Component>> pages = List.of(
+        return List.of(
                 // Page 1 — Title
                 page(Component.empty()
                         .append(Component.literal("\n\n").withStyle(body))
@@ -152,13 +192,9 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("\n/scgolem threat\n  warn|follow|attack\n").withStyle(cmd))
                         .append(Component.literal("\n/scgolem waypoint\n  add|remove|clear").withStyle(cmd)))
         );
-
-        return new WrittenBookContent(
-                Filterable.passThrough("Security Golem Manual"),
-                "SCGuardGolem", 0, pages, true);
     }
 
-    private static Filterable<Component> page(Component content) {
-        return Filterable.passThrough(content);
+    private static Component page(Component content) {
+        return content;
     }
 }

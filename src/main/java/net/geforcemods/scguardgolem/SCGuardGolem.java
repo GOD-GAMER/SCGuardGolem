@@ -103,7 +103,7 @@ public class SCGuardGolem {
      * on MC 1.21.10/1.21.11 (returned in 26.1); displayClientMessage covers the gap.
      */
     public static void msg(Player player, Component message) {
-        //? if >=1.21.10 && <26.1 {
+        //? if >=1.21.8 && <26.1 {
         /*player.displayClientMessage(message, false);
         *///?} else {
         player.sendSystemMessage(message);
@@ -287,7 +287,7 @@ public class SCGuardGolem {
 
         // Burst of happy-villager particles visible to the placing player
         if (player instanceof ServerPlayer sp) {
-            level.sendParticles(sp, ParticleTypes.HAPPY_VILLAGER, true, true,
+            particles(level, sp, ParticleTypes.HAPPY_VILLAGER,
                     pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5,
                     12, 0.3, 0.3, 0.3, 0.0);
         }
@@ -321,9 +321,9 @@ public class SCGuardGolem {
 
             // Node marker: flame = current target, end_rod = others
             if (i == currentIdx) {
-                level.sendParticles(sp, ParticleTypes.FLAME, true, true, wx, wy, wz, 3, 0.1, 0.1, 0.1, 0.0);
+                particles(level, sp, ParticleTypes.FLAME, wx, wy, wz, 3, 0.1, 0.1, 0.1, 0.0);
             } else {
-                level.sendParticles(sp, ParticleTypes.END_ROD, true, true, wx, wy, wz, 2, 0.08, 0.08, 0.08, 0.0);
+                particles(level, sp, ParticleTypes.END_ROD, wx, wy, wz, 2, 0.08, 0.08, 0.08, 0.0);
             }
 
             // Line from this waypoint to the next (wraps around)
@@ -338,16 +338,26 @@ public class SCGuardGolem {
                     double lx = from.x + (to.x - from.x) * t;
                     double ly = from.y + (to.y - from.y) * t;
                     double lz = from.z + (to.z - from.z) * t;
-                    level.sendParticles(sp, ParticleTypes.END_ROD, true, true, lx, ly, lz, 1, 0, 0, 0, 0.0);
+                    particles(level, sp, ParticleTypes.END_ROD, lx, ly, lz, 1, 0, 0, 0, 0.0);
                 }
             }
         }
 
         // Preview dot at the player's own feet
         BlockPos pp = player.blockPosition();
-        level.sendParticles(sp, ParticleTypes.CRIT, true, true,
+        particles(level, sp, ParticleTypes.CRIT,
                 pp.getX() + 0.5, pp.getY() + 0.3, pp.getZ() + 0.5,
                 1, 0.15, 0.0, 0.15, 0.0);
+    }
+
+
+    /** ServerLevel#sendParticles gained a second boolean (alwaysShow) in 1.21.2. */
+    private static void particles(ServerLevel level, ServerPlayer sp, net.minecraft.core.particles.SimpleParticleType type,
+            double x, double y, double z, int count, double dx, double dy, double dz, double speed) {
+        //? if >=1.21.8 {
+        level.sendParticles(sp, type, true, true, x, y, z, count, dx, dy, dz, speed);
+        //?} else
+        /*level.sendParticles(sp, type, true, x, y, z, count, dx, dy, dz, speed);*/
     }
 
     // -----------------------------------------------------------------------
