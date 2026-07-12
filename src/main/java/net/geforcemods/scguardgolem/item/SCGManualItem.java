@@ -37,22 +37,22 @@ public class SCGManualItem extends Item {
         Style highlight = Style.EMPTY.withColor(ChatFormatting.GOLD);
 
         List<Filterable<Component>> pages = List.of(
-                // Page 1 — Title
+                // Page 1 â€” Title
                 page(Component.empty()
                         .append(Component.literal("\n\n").withStyle(body))
                         .append(Component.literal("Security Guard\nGolem Manual").withStyle(header))
                         .append(Component.literal("\n\n").withStyle(body))
-                        .append(Component.literal("v1.4 — Route &\nDwell Update").withStyle(highlight))
+                        .append(Component.literal("v1.4 â€” Route &\nDwell Update").withStyle(highlight))
                         .append(Component.literal("\n\n").withStyle(body))
                         .append(Component.literal("A complete guide\nto your Security\nGolem.").withStyle(dim))),
-                // Page 2 — Getting Started
+                // Page 2 â€” Getting Started
                 page(Component.empty()
                         .append(Component.literal("Getting Started\n\n").withStyle(header))
                         .append(Component.literal("1. Build a vanilla\n   Iron Golem\n\n").withStyle(body))
                         .append(Component.literal("2. Hold any SC\n   Keycard\n\n").withStyle(body))
                         .append(Component.literal("3. Right-click the\n   Iron Golem\n\n").withStyle(body))
                         .append(Component.literal("The keycard is\nconsumed and you\nbecome its owner.").withStyle(dim))),
-                // Page 3 — 4-Tab GUI
+                // Page 3 â€” 4-Tab GUI
                 page(Component.empty()
                         .append(Component.literal("Configuration GUI\n\n").withStyle(header))
                         .append(Component.literal("Right-click your\ngolem with SC ").withStyle(body))
@@ -66,7 +66,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal(" - Allow/Deny\n").withStyle(dim))
                         .append(Component.literal("Route").withStyle(highlight))
                         .append(Component.literal(" - Waypoints &\n  dwell time").withStyle(dim))),
-                // Page 4 — Module Upgrades
+                // Page 4 â€” Module Upgrades
                 page(Component.empty()
                         .append(Component.literal("Module Upgrades\n\n").withStyle(header))
                         .append(Component.literal("Place SC modules in\nthe GUI slots.\nStack count = level\n(max 5).\n\n").withStyle(body))
@@ -82,7 +82,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Allow list\n").withStyle(dim))
                         .append(Component.literal("Denylist  ").withStyle(highlight))
                         .append(Component.literal("Deny list").withStyle(dim))),
-                // Page 5 — Setting Waypoints
+                // Page 5 â€” Setting Waypoints
                 page(Component.empty()
                         .append(Component.literal("Setting Waypoints\n\n").withStyle(header))
                         .append(Component.literal("Hold SC ").withStyle(body))
@@ -91,7 +91,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Crouch twice").withStyle(highlight))
                         .append(Component.literal(" within\n1.5 seconds to\nplace a waypoint\nat your feet.\n\n").withStyle(body))
                         .append(Component.literal("A particle burst\nconfirms placement.\nThe golem must be\nwithin 64 blocks.").withStyle(dim))),
-                // Page 6 — Route Tab & Dwell
+                // Page 6 â€” Route Tab & Dwell
                 page(Component.empty()
                         .append(Component.literal("Route Tab\n\n").withStyle(header))
                         .append(Component.literal("Open the ").withStyle(body))
@@ -106,7 +106,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal(" / ").withStyle(body))
                         .append(Component.literal("[+]").withStyle(highlight))
                         .append(Component.literal(" buttons)").withStyle(body))),
-                // Page 7 — Route Particle Preview
+                // Page 7 â€” Route Particle Preview
                 page(Component.empty()
                         .append(Component.literal("Route Visualizer\n\n").withStyle(header))
                         .append(Component.literal("While holding ").withStyle(body))
@@ -118,7 +118,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal(" =\n  other waypoints\n").withStyle(dim))
                         .append(Component.literal("Crit dot").withStyle(highlight))
                         .append(Component.literal(" = your\n  next drop point").withStyle(dim))),
-                // Page 8 — Allow/Deny Lists
+                // Page 8 â€” Allow/Deny Lists
                 page(Component.empty()
                         .append(Component.literal("Allow / Deny Lists\n\n").withStyle(header))
                         .append(Component.literal("Open the ").withStyle(body))
@@ -132,7 +132,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Click ").withStyle(body))
                         .append(Component.literal("[x]").withStyle(highlight))
                         .append(Component.literal(" beside a\nname to remove it.").withStyle(dim))),
-                // Page 9 — Bell Recall
+                // Page 9 â€” Bell Recall
                 page(Component.empty()
                         .append(Component.literal("Bell Recall\n\n").withStyle(header))
                         .append(Component.literal("Right-click any ").withStyle(body))
@@ -141,7 +141,7 @@ public class SCGManualItem extends Item {
                         .append(Component.literal("Golems stop patrol\nand wait at start.\nUse the ").withStyle(dim))
                         .append(Component.literal("Patrol").withStyle(highlight))
                         .append(Component.literal("\nbutton to restart.").withStyle(dim))),
-                // Page 10 — Commands
+                // Page 10 â€” Commands
                 page(Component.empty()
                         .append(Component.literal("Commands\n\n").withStyle(header))
                         .append(Component.literal("/scgolem status\n").withStyle(cmd))

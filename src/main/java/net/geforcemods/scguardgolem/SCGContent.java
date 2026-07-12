@@ -11,7 +11,10 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+//? if >=1.21.11 {
 import net.minecraft.world.entity.animal.golem.IronGolem;
+//?} else
+/*import net.minecraft.world.entity.animal.IronGolem;*/
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;

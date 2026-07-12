@@ -9,6 +9,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity.ThreatMode;
 import net.minecraft.commands.CommandSourceStack;
+//? if >=1.21.11
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -24,7 +25,11 @@ public class SCGCommands {
     private static final double SEARCH_RANGE = 32.0;
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
-        dispatcher.register(Commands.literal("scgolem").requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+        dispatcher.register(Commands.literal("scgolem")
+                //? if >=1.21.11 {
+                .requires(src -> src.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER))
+                //?} else
+                /*.requires(src -> src.hasPermission(2))*/
                 .then(Commands.literal("patrol")
                         .then(Commands.literal("start").executes(SCGCommands::patrolStart))
                         .then(Commands.literal("stop").executes(SCGCommands::patrolStop))
@@ -56,7 +61,7 @@ public class SCGCommands {
         AABB box = new AABB(pos.x - SEARCH_RANGE, pos.y - SEARCH_RANGE, pos.z - SEARCH_RANGE,
                 pos.x + SEARCH_RANGE, pos.y + SEARCH_RANGE, pos.z + SEARCH_RANGE);
         List<SecurityGolemEntity> golems = ctx.getSource().getLevel()
-                .getEntitiesOfClass(SecurityGolemEntity.class, box);
+                .getEntitiesOfClass(SecurityGolemEntity.class, box, e -> true);
         if (golems.isEmpty()) {
             ctx.getSource().sendFailure(Component.translatable("scguardgolem.command.no_golem"));
             return null;

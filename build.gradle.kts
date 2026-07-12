@@ -29,7 +29,13 @@ java {
 }
 
 neoForge {
-    version = m.getValue("loader_min")
+    enable {
+        version = m.getValue("loader_min")
+        // Binary pipeline: skip Vineflower decompile + recompile (OOM-prone with
+        // 8 targets; also MDG's default when CI=true). Pass -Pscg.decompile for
+        // browsable Minecraft sources in the IDE.
+        setDisableRecompilation(!providers.gradleProperty("scg.decompile").isPresent)
+    }
 
     runs {
         register("client") {

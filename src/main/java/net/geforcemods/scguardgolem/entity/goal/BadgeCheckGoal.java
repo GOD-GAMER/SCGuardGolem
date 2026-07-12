@@ -45,7 +45,10 @@ public class BadgeCheckGoal extends Goal {
             if (golem.isOwner(player)) continue;
 
             if (SCGuardGolem.isPlayerTrustedByOwner(
+                    //? if >=1.21.10 {
                     player.getGameProfile().id().toString(),
+                    //?} else
+                    /*player.getGameProfile().getId().toString(),*/
                     playerName,
                     golem.getOwnerUUID(),
                     golem.getOwnerName())) continue;
@@ -57,7 +60,7 @@ public class BadgeCheckGoal extends Goal {
     private void handleUntrustedPlayer(Player player) {
         ThreatMode mode = golem.getThreatMode();
         switch (mode) {
-            case WARN -> player.sendSystemMessage(
+            case WARN -> SCGuardGolem.msg(player,
                     Component.translatable("scguardgolem.badge_check.halt"));
             case FOLLOW, ATTACK -> golem.setTarget(player);
         }

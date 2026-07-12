@@ -16,14 +16,13 @@ import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -37,7 +36,10 @@ import net.minecraft.world.entity.ai.goal.MoveTowardsTargetGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+//? if >=1.21.11 {
 import net.minecraft.world.entity.animal.golem.IronGolem;
+//?} else
+/*import net.minecraft.world.entity.animal.IronGolem;*/
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Enemy;
@@ -45,10 +47,13 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
+//? if >=1.21.8 {
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+//?}
+//? if >=1.21.1
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
 public class SecurityGolemEntity extends IronGolem implements MenuProvider {
@@ -86,10 +91,17 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             super.setChanged();
             onModulesChanged();
         }
+        //? if >=1.21.1 {
         @Override
         public int getMaxStackSize(ItemStack stack) {
             return MAX_UPGRADE_LEVEL;
         }
+        //?} else {
+        /*@Override
+        public int getMaxStackSize() {
+            return MAX_UPGRADE_LEVEL;
+        }
+        *///?}
     };
     private SimpleContainer lootInventory = new SimpleContainer(BASE_LOOT_SLOTS);
 
@@ -133,6 +145,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         super(type, level);
     }
 
+    //? if >=1.21.1 {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
@@ -143,6 +156,18 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         builder.define(IGNORE_LIST_DATA, "");
         builder.define(ATTACK_LIST_DATA, "");
     }
+    //?} else {
+    /*@Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        entityData.define(PATROLLING, false);
+        entityData.define(OWNER_UUID, "");
+        entityData.define(OWNER_NAME, "");
+        entityData.define(THREAT_MODE, ThreatMode.WARN.ordinal());
+        entityData.define(IGNORE_LIST_DATA, "");
+        entityData.define(ATTACK_LIST_DATA, "");
+    }
+    *///?}
 
     @Override
     protected void registerGoals() {
@@ -155,9 +180,15 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
         this.targetSelector.addGoal(2, new PlayerThreatGoal(this));
+        //? if >=1.21.8 {
         this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
                 net.minecraft.world.entity.Mob.class, 5, false, false,
                 (entity, level) -> entity instanceof Enemy && !(entity instanceof Creeper)));
+        //?} else {
+        /*this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
+                net.minecraft.world.entity.Mob.class, 5, false, false,
+                entity -> entity instanceof Enemy && !(entity instanceof Creeper)));
+        *///?}
     }
 
     @Override
@@ -202,8 +233,8 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         return new GolemMenu(containerId, playerInv, this);
     }
 
-    @Override
-    public void writeClientSideData(AbstractContainerMenu menu, net.minecraft.network.RegistryFriendlyByteBuf buf) {
+    /** Extra menu data; used by writeClientSideData (NeoForge) / NetworkHooks (Forge 1.20.1). */
+    public void writeMenuData(FriendlyByteBuf buf) {
         buf.writeInt(this.getId());
         buf.writeInt(getLootRows());
         // Waypoints
@@ -218,16 +249,30 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         buf.writeInt(currentWaypointIndex);
     }
 
+    //? if forge {
+    /*// Forge 1.20.1: extra data goes through NetworkHooks.openScreen(…, this::writeMenuData)
+    *///?} elif <1.21.1 {
+    /*@Override
+    public void writeClientSideData(AbstractContainerMenu menu, FriendlyByteBuf buf) {
+        writeMenuData(buf);
+    }
+    *///?} else {
+    @Override
+    public void writeClientSideData(AbstractContainerMenu menu, RegistryFriendlyByteBuf buf) {
+        writeMenuData(buf);
+    }
+    //?}
+
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
-            if (isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (SCGuardGolem.canConfigure(this, player)) {
                 if (player instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.openMenu(this);
+                    SCGuardGolem.openGolemMenu(serverPlayer, this);
                 }
                 return InteractionResult.SUCCESS;
             } else {
-                player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
+                SCGuardGolem.msg(player, Component.literal("§c[Security Golem] You are not the owner."));
             }
         }
         return InteractionResult.PASS;
@@ -235,14 +280,20 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
     // -- Owner --
     public void setGolemOwner(Player player) {
+        //? if >=1.21.10 {
         entityData.set(OWNER_UUID, player.getGameProfile().id().toString());
+        //?} else
+        /*entityData.set(OWNER_UUID, player.getGameProfile().getId().toString());*/
         entityData.set(OWNER_NAME, player.getName().getString());
     }
     public String getOwnerUUID() { return entityData.get(OWNER_UUID); }
     public String getOwnerName() { return entityData.get(OWNER_NAME); }
     public boolean isOwner(Player player) {
         String uuid = getOwnerUUID();
+        //? if >=1.21.10 {
         return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
+        //?} else
+        /*return !uuid.isEmpty() && uuid.equals(player.getGameProfile().getId().toString());*/
     }
 
     // -- Module Inventory --
@@ -364,7 +415,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             for (int i = needed; i < lootInventory.getContainerSize(); i++) {
                 ItemStack overflow = lootInventory.getItem(i);
                 if (!overflow.isEmpty() && level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                    //? if >=1.21.8 {
                     spawnAtLocation(serverLevel, overflow);
+                    //?} else
+                    /*spawnAtLocation(overflow);*/
                 }
             }
         }
@@ -480,22 +534,49 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     public void setThreatMode(ThreatMode m) { entityData.set(THREAT_MODE, m.ordinal()); }
 
     // -- Drop everything on death --
+    //? if >=1.21.1 {
     @Override
     protected void dropAllDeathLoot(net.minecraft.server.level.ServerLevel level, net.minecraft.world.damagesource.DamageSource source) {
         super.dropAllDeathLoot(level, source);
         for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
             ItemStack stack = moduleInventory.getItem(i);
-            if (!stack.isEmpty()) spawnAtLocation(level, stack);
+            if (!stack.isEmpty()) dropStack(stack);
         }
         moduleInventory.clearContent();
         for (int i = 0; i < lootInventory.getContainerSize(); i++) {
             ItemStack stack = lootInventory.getItem(i);
-            if (!stack.isEmpty()) spawnAtLocation(level, stack);
+            if (!stack.isEmpty()) dropStack(stack);
         }
         lootInventory.clearContent();
     }
+    //?} else {
+    /*@Override
+    protected void dropAllDeathLoot(net.minecraft.world.damagesource.DamageSource source) {
+        super.dropAllDeathLoot(source);
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack stack = moduleInventory.getItem(i);
+            if (!stack.isEmpty()) dropStack(stack);
+        }
+        moduleInventory.clearContent();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack stack = lootInventory.getItem(i);
+            if (!stack.isEmpty()) dropStack(stack);
+        }
+        lootInventory.clearContent();
+    }
+    *///?}
+
+    /** spawnAtLocation across the 1.21.2 ServerLevel-parameter change. */
+    private void dropStack(ItemStack stack) {
+        //? if >=1.21.8 {
+        if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel)
+            spawnAtLocation(serverLevel, stack);
+        //?} else
+        /*spawnAtLocation(stack);*/
+    }
 
     // -- Persistence --
+    //? if >=1.21.8 {
     @Override
     public void addAdditionalSaveData(ValueOutput tag) {
         super.addAdditionalSaveData(tag);
@@ -593,4 +674,241 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
         if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
     }
+    //?} elif >=1.21.1 {
+    /*@Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putString("GolemOwnerUUID", getOwnerUUID());
+        tag.putString("GolemOwnerName", getOwnerName());
+        tag.putBoolean("Patrolling", isPatrolling());
+        tag.putDouble("PatrolSpeed", patrolSpeed);
+        tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
+        tag.putInt("ThreatMode", getThreatMode().ordinal());
+        tag.putString("LootPassword", lootPassword);
+        tag.putBoolean("Recalling", recalling);
+        tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("SavedWaypointIndex", savedWaypointIndex);
+
+        CompoundTag filterTag = new CompoundTag();
+        filterTag.putInt("Count", lootFilter.size());
+        int fi = 0;
+        for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
+        tag.put("LootFilter", filterTag);
+
+        CompoundTag listsTag = new CompoundTag();
+        listsTag.putInt("IgnoreCount", ignoreList.size());
+        int idx = 0;
+        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
+        listsTag.putInt("AttackCount", attackList.size());
+        idx = 0;
+        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
+        tag.put("AllowDenyLists", listsTag);
+
+        CompoundTag waypointTag = new CompoundTag();
+        waypointTag.putInt("Count", waypoints.size());
+        for (int i = 0; i < waypoints.size(); i++) {
+            BlockPos wp = waypoints.get(i);
+            waypointTag.putInt("X" + i, wp.getX());
+            waypointTag.putInt("Y" + i, wp.getY());
+            waypointTag.putInt("Z" + i, wp.getZ());
+            waypointTag.putString("Name" + i, i < waypointNames.size() ? waypointNames.get(i) : "");
+        }
+        tag.put("Waypoints", waypointTag);
+
+        net.minecraft.nbt.ListTag moduleList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack s = moduleInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = (CompoundTag) s.save(registryAccess());
+                it.putInt("Slot", i);
+                moduleList.add(it);
+            }
+        }
+        tag.put("Modules", moduleList);
+
+        net.minecraft.nbt.ListTag lootList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack s = lootInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = (CompoundTag) s.save(registryAccess());
+                it.putInt("Slot", i);
+                lootList.add(it);
+            }
+        }
+        tag.put("LootItems", lootList);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        readCommonTag(tag);
+
+        moduleInventory.clearContent();
+        if (tag.contains("Modules")) {
+            net.minecraft.nbt.ListTag ml = tag.getList("Modules", 10);
+            for (int i = 0; i < ml.size(); i++) {
+                CompoundTag it = ml.getCompound(i);
+                final int slot = it.getInt("Slot");
+                ItemStack.parse(registryAccess(), it).ifPresent(s -> { if (slot >= 0 && slot < moduleInventory.getContainerSize()) moduleInventory.setItem(slot, s); });
+            }
+        }
+
+        applyUpgrades();
+        resizeLootInventory();
+
+        lootInventory.clearContent();
+        if (tag.contains("LootItems")) {
+            net.minecraft.nbt.ListTag ll = tag.getList("LootItems", 10);
+            for (int i = 0; i < ll.size(); i++) {
+                CompoundTag it = ll.getCompound(i);
+                final int slot = it.getInt("Slot");
+                ItemStack.parse(registryAccess(), it).ifPresent(s -> { if (slot >= 0 && slot < lootInventory.getContainerSize()) lootInventory.setItem(slot, s); });
+            }
+        }
+
+        if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
+    }
+    *///?} else {
+    /*@Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.putString("GolemOwnerUUID", getOwnerUUID());
+        tag.putString("GolemOwnerName", getOwnerName());
+        tag.putBoolean("Patrolling", isPatrolling());
+        tag.putDouble("PatrolSpeed", patrolSpeed);
+        tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
+        tag.putInt("ThreatMode", getThreatMode().ordinal());
+        tag.putString("LootPassword", lootPassword);
+        tag.putBoolean("Recalling", recalling);
+        tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("SavedWaypointIndex", savedWaypointIndex);
+
+        CompoundTag filterTag = new CompoundTag();
+        filterTag.putInt("Count", lootFilter.size());
+        int fi = 0;
+        for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
+        tag.put("LootFilter", filterTag);
+
+        CompoundTag listsTag = new CompoundTag();
+        listsTag.putInt("IgnoreCount", ignoreList.size());
+        int idx = 0;
+        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
+        listsTag.putInt("AttackCount", attackList.size());
+        idx = 0;
+        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
+        tag.put("AllowDenyLists", listsTag);
+
+        CompoundTag waypointTag = new CompoundTag();
+        waypointTag.putInt("Count", waypoints.size());
+        for (int i = 0; i < waypoints.size(); i++) {
+            BlockPos wp = waypoints.get(i);
+            waypointTag.putInt("X" + i, wp.getX());
+            waypointTag.putInt("Y" + i, wp.getY());
+            waypointTag.putInt("Z" + i, wp.getZ());
+            waypointTag.putString("Name" + i, i < waypointNames.size() ? waypointNames.get(i) : "");
+        }
+        tag.put("Waypoints", waypointTag);
+
+        net.minecraft.nbt.ListTag moduleList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack s = moduleInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = s.save(new CompoundTag());
+                it.putInt("Slot", i);
+                moduleList.add(it);
+            }
+        }
+        tag.put("Modules", moduleList);
+
+        net.minecraft.nbt.ListTag lootList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack s = lootInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = s.save(new CompoundTag());
+                it.putInt("Slot", i);
+                lootList.add(it);
+            }
+        }
+        tag.put("LootItems", lootList);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        readCommonTag(tag);
+
+        moduleInventory.clearContent();
+        if (tag.contains("Modules")) {
+            net.minecraft.nbt.ListTag ml = tag.getList("Modules", 10);
+            for (int i = 0; i < ml.size(); i++) {
+                CompoundTag it = ml.getCompound(i);
+                int slot = it.getInt("Slot");
+                ItemStack s = ItemStack.of(it);
+                if (!s.isEmpty() && slot >= 0 && slot < moduleInventory.getContainerSize()) moduleInventory.setItem(slot, s);
+            }
+        }
+
+        applyUpgrades();
+        resizeLootInventory();
+
+        lootInventory.clearContent();
+        if (tag.contains("LootItems")) {
+            net.minecraft.nbt.ListTag ll = tag.getList("LootItems", 10);
+            for (int i = 0; i < ll.size(); i++) {
+                CompoundTag it = ll.getCompound(i);
+                int slot = it.getInt("Slot");
+                ItemStack s = ItemStack.of(it);
+                if (!s.isEmpty() && slot >= 0 && slot < lootInventory.getContainerSize()) lootInventory.setItem(slot, s);
+            }
+        }
+
+        if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
+    }
+    *///?}
+
+    /** Shared CompoundTag reads for the pre-1.21.8 load paths. */
+    //? if <1.21.8 {
+    /*private void readCommonTag(CompoundTag tag) {
+        entityData.set(OWNER_UUID, tag.getString("GolemOwnerUUID"));
+        entityData.set(OWNER_NAME, tag.getString("GolemOwnerName"));
+        entityData.set(PATROLLING, tag.getBoolean("Patrolling"));
+        patrolSpeed = tag.contains("PatrolSpeed") ? tag.getDouble("PatrolSpeed") : 1.0;
+        currentWaypointIndex = tag.getInt("CurrentWaypointIndex");
+        entityData.set(THREAT_MODE, tag.contains("ThreatMode") ? tag.getInt("ThreatMode") : ThreatMode.WARN.ordinal());
+        lootPassword = tag.getString("LootPassword");
+        recalling = tag.getBoolean("Recalling");
+        dwellTicks = tag.getInt("DwellTicks");
+        savedWaypointIndex = tag.getInt("SavedWaypointIndex");
+
+        lootFilter.clear();
+        if (tag.contains("LootFilter")) {
+            CompoundTag ft = tag.getCompound("LootFilter");
+            int fc = ft.getInt("Count");
+            for (int i = 0; i < fc; i++) { String id = ft.getString("Filter" + i); if (!id.isEmpty()) lootFilter.add(id); }
+        }
+
+        ignoreList.clear();
+        attackList.clear();
+        if (tag.contains("AllowDenyLists")) {
+            CompoundTag lt = tag.getCompound("AllowDenyLists");
+            int ic = lt.getInt("IgnoreCount");
+            for (int i = 0; i < ic; i++) { String n = lt.getString("Ignore" + i); if (!n.isEmpty()) ignoreList.add(n); }
+            int ac = lt.getInt("AttackCount");
+            for (int i = 0; i < ac; i++) { String n = lt.getString("Attack" + i); if (!n.isEmpty()) attackList.add(n); }
+        }
+        syncLists();
+
+        waypoints.clear();
+        waypointNames.clear();
+        waypointsView = null;
+        if (tag.contains("Waypoints")) {
+            CompoundTag wc = tag.getCompound("Waypoints");
+            int count = wc.getInt("Count");
+            for (int i = 0; i < count; i++) {
+                waypoints.add(new BlockPos(wc.getInt("X" + i), wc.getInt("Y" + i), wc.getInt("Z" + i)));
+                waypointNames.add(wc.getString("Name" + i));
+            }
+        }
+    }
+    *///?}
 }

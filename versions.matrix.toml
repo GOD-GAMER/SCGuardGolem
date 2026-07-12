@@ -130,8 +130,10 @@ loader              = "neoforge"
 java                = 21
 mc_min              = "1.21.10"
 mc_max              = "1.21.11"
-loader_min          = "21.10.63"         # SC 1.21.10 branch pin; verified on maven
-loader_artifact     = "net.neoforged:neoforge:21.10.63"
+loader_min          = "21.10.64"         # 21.10.63 (SC's pin) has binary patches incompatible
+                                         # with MDG 2.0.141's NFRT rename output (checksum
+                                         # mismatch on OctahedralGroup); 21.10.64 resolves it.
+loader_artifact     = "net.neoforged:neoforge:21.10.64"
 sc_version          = "1.10.2.1"
 sc_min              = "1.10.2.1"
 sc_max              = "1.11"
