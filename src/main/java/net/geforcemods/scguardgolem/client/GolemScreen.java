@@ -61,13 +61,9 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     // Toggle buttons for config tab
     private Button patrolBtn, threatBtn, clearRouteBtn;
     // Lists tab: picker scroll offset
-    private int pickerScroll = 0;
-    private List<PickerEntry> pickerEntries = List.of();
-    // Dynamic buttons for Lists tab
+    // Dynamic buttons for the Route tab (rebuilt on change)
     private final List<Button> listButtons = new ArrayList<>();
     private boolean listButtonsDirty = true;
-    private int lastIgnoreSize = -1;
-    private int lastAttackSize = -1;
     private int lastWaypointSize = -1;
 
     public GolemScreen(GolemMenu menu, Inventory playerInv, Component title) {
@@ -121,11 +117,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         threatBtn.visible = config;
         clearRouteBtn.visible = config;
         clearListButtons();
-        if (tab == GolemMenu.TAB_LISTS) {
-            pickerScroll = 0;
-            refreshPickerEntries();
-            listButtonsDirty = true;
-        } else if (tab == GolemMenu.TAB_WAYPOINTS) {
+        if (tab == GolemMenu.TAB_WAYPOINTS) {
             listButtonsDirty = true;
         }
         clickButton(200 + tab);
@@ -182,15 +174,6 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     /*@Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
     *///?}
-        if (menu.getCurrentTab() == GolemMenu.TAB_LISTS) {
-            int maxPickerScroll = Math.max(0, pickerEntries.size() - getPickerVisibleCount(calcPickerStartY(topPos)));
-            if (maxPickerScroll > 0) {
-                int delta = scrollY > 0 ? -1 : 1;
-                pickerScroll = Math.max(0, Math.min(pickerScroll + delta, maxPickerScroll));
-                listButtonsDirty = true;
-                return true;
-            }
-        }
         if (menu.getCurrentTab() == GolemMenu.TAB_LOOT && menu.getMaxScroll() > 0) {
             int delta = scrollY > 0 ? -1 : 1;
             int newOffset = menu.getScrollOffset() + delta;
@@ -318,11 +301,12 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
     // ---------- CONFIG TAB ----------
     private void drawConfigTab(Gfx g, int x, int y) {
-        String[] labels = {"Harm", "Speed", "Smart", "Store"};
-        for (int i = 0; i < 4; i++) {
-            int col = i % 2;
-            int row = i / 2;
-            int sx = x + GolemMenu.MOD_X - 1 + col * GolemMenu.MOD_COL;
+        // 6 module slots in a 3x2 grid, matching acceptedModules() order.
+        String[] labels = {"Harm", "Speed", "Smart", "Store", "Allow", "Deny"};
+        for (int i = 0; i < labels.length; i++) {
+            int col = i % 3;
+            int row = i / 3;
+            int sx = x + GolemMenu.MOD_X - 1 + col * GolemMenu.MOD_COL_TIGHT;
             int sy = y + GolemMenu.MOD_Y - 1 + row * GolemMenu.MOD_ROW;
 
             g.sprite(SLOT_SPRITE, sx, sy, 18, 18);
@@ -393,30 +377,30 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         g.sprite(SCROLLER_SPRITE, trackX, thumbY, SCROLLER_W, thumbH);
     }
 
-    // ---------- LISTS TAB ----------
-    private static final int LIST_ENTRY_H = 12;
-    private static final int LIST_START_Y = 20;
+    // ---------- LISTS TAB (allow/deny is now SecurityCraft modules) ----------
     private static final int LIST_X = 10;
-    private static final int PICKER_MAX_VISIBLE = 6;
 
-    private record PickerEntry(String name) {}
+    private void drawListsTab(Gfx g, int x, int y) {
+        int curY = y + 20;
+        g.text(font, "Allow / Deny", x + LIST_X, curY, C_TITLE, false);
+        curY += 14;
+        g.text(font, "§aAllowlist §7module: " + (menu.getGolem().hasAllowlistModule() ? "§ainstalled" : "§7none"),
+                x + LIST_X, curY, C_DIM, false);
+        curY += 11;
+        g.text(font, "§cDenylist §7module: " + (menu.getGolem().hasDenylistModule() ? "§cinstalled" : "§7none"),
+                x + LIST_X, curY, C_DIM, false);
+        curY += 16;
+        g.text(font, "§7Place SecurityCraft", x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, "§7Allowlist / Denylist", x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, "§7modules in the Config", x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, "§7tab, then right-click a", x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, "§7module to edit its list.", x + LIST_X, curY, C_DIM, false);
+    }
 
     @Override
     public void containerTick() {
         super.containerTick();
-        int curTab = menu.getCurrentTab();
-        if (curTab == GolemMenu.TAB_LISTS) {
-            SecurityGolemEntity golem = menu.getGolem();
-            int ig = golem.getIgnoreListNames().size();
-            int at = golem.getAlwaysAttackListNames().size();
-            if (ig != lastIgnoreSize || at != lastAttackSize) {
-                lastIgnoreSize = ig;
-                lastAttackSize = at;
-                listButtonsDirty = true;
-            }
-            refreshPickerEntries();
-            if (listButtonsDirty) rebuildListButtons();
-        } else if (curTab == GolemMenu.TAB_WAYPOINTS) {
+        if (menu.getCurrentTab() == GolemMenu.TAB_WAYPOINTS) {
             int wpSize = menu.getGolem().getWaypoints().size();
             if (listButtonsDirty || wpSize != lastWaypointSize) {
                 lastWaypointSize = wpSize;
@@ -430,169 +414,6 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     private void clearListButtons() {
         for (Button b : listButtons) removeWidget(b);
         listButtons.clear();
-    }
-
-    private void rebuildListButtons() {
-        clearListButtons();
-        SecurityGolemEntity golem = menu.getGolem();
-        Set<String> ignoreNames = golem.getIgnoreListNames();
-        Set<String> attackNames = golem.getAlwaysAttackListNames();
-        int x = leftPos;
-        int btnH = LIST_ENTRY_H;
-
-        // [x] remove from ignore list
-        int curY = topPos + LIST_START_Y + LIST_ENTRY_H;
-        int ri = 0;
-        for (String name : ignoreNames) {
-            final int idx = ri++;
-            Button b = Button.builder(Component.literal("§cx"), btn -> { clickButton(300 + idx); listButtonsDirty = true; })
-                .bounds(x + W - 22, curY, 14, btnH).build();
-            listButtons.add(addRenderableWidget(b));
-            curY += LIST_ENTRY_H;
-        }
-        if (ignoreNames.isEmpty()) curY += LIST_ENTRY_H;
-
-        curY += 4 + LIST_ENTRY_H; // gap + Deny label
-        int ai = 0;
-        for (String name : attackNames) {
-            final int idx = ai++;
-            Button b = Button.builder(Component.literal("§cx"), btn -> { clickButton(400 + idx); listButtonsDirty = true; })
-                .bounds(x + W - 22, curY, 14, btnH).build();
-            listButtons.add(addRenderableWidget(b));
-            curY += LIST_ENTRY_H;
-        }
-        if (attackNames.isEmpty()) curY += LIST_ENTRY_H;
-
-        // Picker [A]/[D]
-        curY += 4 + 2 + LIST_ENTRY_H; // gap + separator + Entities label
-        int vis = getPickerVisibleCount(curY);
-        for (int i = 0; i < vis; i++) {
-            int idx = pickerScroll + i;
-            if (idx >= pickerEntries.size()) break;
-            int ey = curY + i * LIST_ENTRY_H;
-            final int fIdx = idx;
-            Button aBtn = Button.builder(Component.literal("§aA"), btn -> { clickButton(500 + fIdx); listButtonsDirty = true; })
-                .bounds(x + W - 36, ey, 14, btnH).build();
-            Button dBtn = Button.builder(Component.literal("§cD"), btn -> { clickButton(600 + fIdx); listButtonsDirty = true; })
-                .bounds(x + W - 18, ey, 14, btnH).build();
-            listButtons.add(addRenderableWidget(aBtn));
-            listButtons.add(addRenderableWidget(dBtn));
-        }
-        listButtonsDirty = false;
-    }
-
-    private void refreshPickerEntries() {
-        if (minecraft == null || minecraft.level == null) { pickerEntries = List.of(); return; }
-        SecurityGolemEntity golem = menu.getGolem();
-        Set<String> existing = new LinkedHashSet<>();
-        existing.addAll(golem.getIgnoreListNames());
-        existing.addAll(golem.getAlwaysAttackListNames());
-
-        Set<String> seen = new LinkedHashSet<>();
-        List<PickerEntry> entries = new ArrayList<>();
-
-        // All online players
-        if (minecraft.getConnection() != null) {
-            for (PlayerInfo info : minecraft.getConnection().getOnlinePlayers()) {
-                //? if >=1.21.10 {
-                String name = info.getProfile().name();
-                //?} else
-                /*String name = info.getProfile().getName();*/
-                if (!existing.contains(name) && seen.add(name)) {
-                    entries.add(new PickerEntry(name));
-                }
-            }
-        }
-
-        // All living entities in loaded chunks
-        for (var e : minecraft.level.entitiesForRendering()) {
-            if (e instanceof LivingEntity le && le.isAlive() && le != golem && !(le instanceof Player)) {
-                String name = le.getName().getString();
-                if (!existing.contains(name) && seen.add(name)) {
-                    entries.add(new PickerEntry(name));
-                }
-            }
-        }
-        pickerEntries = entries;
-    }
-
-    private int getPickerVisibleCount(int pickerStartY) {
-        int available = (topPos + menu.getPlayerInvY() - 22 - pickerStartY) / LIST_ENTRY_H;
-        return Math.max(1, Math.min(available, PICKER_MAX_VISIBLE));
-    }
-
-    private int calcPickerStartY(int y) {
-        SecurityGolemEntity golem = menu.getGolem();
-        int h = LIST_START_Y;
-        h += LIST_ENTRY_H; // Allow label
-        h += Math.max(1, golem.getIgnoreListNames().size()) * LIST_ENTRY_H;
-        h += 4;
-        h += LIST_ENTRY_H; // Deny label
-        h += Math.max(1, golem.getAlwaysAttackListNames().size()) * LIST_ENTRY_H;
-        h += 4 + 2 + LIST_ENTRY_H; // gap + separator + Entities label
-        return y + h;
-    }
-
-    private void drawListsTab(Gfx g, int x, int y) {
-        refreshPickerEntries();
-        SecurityGolemEntity golem = menu.getGolem();
-        Set<String> ignoreNames = golem.getIgnoreListNames();
-        Set<String> attackNames = golem.getAlwaysAttackListNames();
-
-        // Allow section
-        int curY = y + LIST_START_Y;
-        g.text(font, "§aAllow:", x + LIST_X, curY, 0xFF55FF55, false);
-        curY += LIST_ENTRY_H;
-        if (ignoreNames.isEmpty()) {
-            g.text(font, "§7(empty)", x + LIST_X + 4, curY, C_DIM, false);
-            curY += LIST_ENTRY_H;
-        } else {
-            for (String name : ignoreNames) {
-                g.text(font, "§a● " + name, x + LIST_X + 2, curY, 0xFF55FF55, false);
-                g.text(font, "§7[§cx§7]", x + W - 24, curY, 0xFFAAAAAA, false);
-                curY += LIST_ENTRY_H;
-            }
-        }
-
-        curY += 4;
-        // Deny section
-        g.text(font, "§cDeny:", x + LIST_X, curY, 0xFFFF5555, false);
-        curY += LIST_ENTRY_H;
-        if (attackNames.isEmpty()) {
-            g.text(font, "§7(empty)", x + LIST_X + 4, curY, C_DIM, false);
-            curY += LIST_ENTRY_H;
-        } else {
-            for (String name : attackNames) {
-                g.text(font, "§c● " + name, x + LIST_X + 2, curY, 0xFFFF5555, false);
-                g.text(font, "§7[§cx§7]", x + W - 24, curY, 0xFFAAAAAA, false);
-                curY += LIST_ENTRY_H;
-            }
-        }
-
-        // Nearby entities picker
-        curY += 4;
-        g.fill(x + 7, curY, x + W - 7, curY + 1, C_SEP);
-        curY += 2;
-        g.text(font, "§fEntities:", x + LIST_X, curY, 0xFFFFFFFF, false);
-        curY += LIST_ENTRY_H;
-
-        if (pickerEntries.isEmpty()) {
-            g.text(font, "§7(none)", x + LIST_X + 4, curY, C_DIM, false);
-        } else {
-            int visible = getPickerVisibleCount(curY);
-            for (int i = 0; i < visible; i++) {
-                int idx = pickerScroll + i;
-                if (idx >= pickerEntries.size()) break;
-                PickerEntry pe = pickerEntries.get(idx);
-                g.text(font, "§f" + pe.name(), x + LIST_X + 2, curY, 0xFFFFFFFF, false);
-                g.text(font, "§a[A]", x + W - 36, curY, 0xFF55FF55, false);
-                g.text(font, "§c[D]", x + W - 18, curY, 0xFFFF5555, false);
-                curY += LIST_ENTRY_H;
-            }
-            if (pickerEntries.size() > visible) {
-                g.text(font, "§8↑↓ scroll", x + LIST_X, curY, C_DIM, false);
-            }
-        }
     }
 
     // ---------- PLAYER INVENTORY (both tabs) ----------

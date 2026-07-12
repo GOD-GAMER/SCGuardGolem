@@ -52,7 +52,8 @@ public class GolemMenu extends AbstractContainerMenu {
     // ?? Config tab slot positions (relative to GUI top-left) ??
     public static final int MOD_X = 8;
     public static final int MOD_Y = 20;
-    public static final int MOD_COL = 50;  // 18px slot + 32px label space
+    public static final int MOD_COL = 50;  // legacy 2-col spacing (kept for screen refs)
+    public static final int MOD_COL_TIGHT = 54; // 3-col spacing for 6 module slots
     public static final int MOD_ROW = 28;  // 18px slot + 10px gap for label below
 
     // Config content bottom (modules + buttons + status)
@@ -92,12 +93,13 @@ public class GolemMenu extends AbstractContainerMenu {
         };
         addDataSlots(this.data);
 
-        // ?? Module slots (visible on CONFIG tab) — 2x2 grid ??
+        // Module slots (visible on CONFIG tab) — 3x2 grid for the 6 SC module types
         for (int row = 0; row < 2; row++) {
-            for (int col = 0; col < 2; col++) {
-                int index = row * 2 + col;
+            for (int col = 0; col < 3; col++) {
+                int index = row * 3 + col;
+                if (index >= moduleContainer.getContainerSize()) continue;
                 ModuleSlot ms = new ModuleSlot(moduleContainer, index,
-                        MOD_X + col * MOD_COL,
+                        MOD_X + col * MOD_COL_TIGHT,
                         MOD_Y + row * MOD_ROW);
                 ms.setActiveCheck(() -> currentTab == TAB_CONFIG);
                 addSlot(ms);
@@ -271,34 +273,8 @@ public class GolemMenu extends AbstractContainerMenu {
             setTab(buttonId - 200);
             return true;
         }
-        // Remove from ignore list: button IDs 300+
-        if (buttonId >= 300 && buttonId < 400) {
-            int idx = buttonId - 300;
-            List<String> names = new ArrayList<>(golem.getIgnoreListNames());
-            if (idx >= 0 && idx < names.size()) golem.removeFromIgnoreList(names.get(idx));
-            return true;
-        }
-        // Remove from attack list: button IDs 400+
-        if (buttonId >= 400 && buttonId < 500) {
-            int idx = buttonId - 400;
-            List<String> names = new ArrayList<>(golem.getAlwaysAttackListNames());
-            if (idx >= 0 && idx < names.size()) golem.removeFromAttackList(names.get(idx));
-            return true;
-        }
-        // Add to ignore list by picker index: button IDs 500+
-        if (buttonId >= 500 && buttonId < 600) {
-            int idx = buttonId - 500;
-            List<String> available = getAvailableEntityNames(player);
-            if (idx >= 0 && idx < available.size()) golem.addToIgnoreList(available.get(idx));
-            return true;
-        }
-        // Add to attack list by picker index: button IDs 600+
-        if (buttonId >= 600 && buttonId < 700) {
-            int idx = buttonId - 600;
-            List<String> available = getAvailableEntityNames(player);
-            if (idx >= 0 && idx < available.size()) golem.addToAttackList(available.get(idx));
-            return true;
-        }
+        // Allow/deny are now SecurityCraft ALLOWLIST/DENYLIST modules — edit them
+        // via SC's own list-module screen, not through this menu (button IDs 300-699 retired).
         // Remove waypoint by index: button IDs 700+
         if (buttonId >= 700 && buttonId < 800) {
             int idx = buttonId - 700;
@@ -322,34 +298,6 @@ public class GolemMenu extends AbstractContainerMenu {
             return true;
         }
         return false;
-    }
-
-    private List<String> getAvailableEntityNames(Player player) {
-        Set<String> existing = new LinkedHashSet<>();
-        existing.addAll(golem.getIgnoreListNames());
-        existing.addAll(golem.getAlwaysAttackListNames());
-
-        Set<String> seen = new LinkedHashSet<>();
-        List<String> names = new ArrayList<>();
-
-        // Online players
-        var server = golem.level().getServer();
-        if (server != null) {
-            for (var sp : server.getPlayerList().getPlayers()) {
-                String name = sp.getName().getString();
-                if (!existing.contains(name) && seen.add(name)) names.add(name);
-            }
-        }
-
-        // All living entities in golem's level
-        var level = golem.level();
-        for (var e : level.getEntitiesOfClass(LivingEntity.class,
-                golem.getBoundingBox().inflate(128.0),
-                e -> e.isAlive() && e != golem && !(e instanceof net.minecraft.world.entity.player.Player))) {
-            String name = e.getName().getString();
-            if (!existing.contains(name) && seen.add(name)) names.add(name);
-        }
-        return names;
     }
 
     public SecurityGolemEntity getGolem() { return golem; }

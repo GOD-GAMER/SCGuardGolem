@@ -38,20 +38,10 @@ public class BadgeCheckGoal extends Goal {
         for (Player player : nearbyPlayers) {
             if (!golem.getSensing().hasLineOfSight(player)) continue;
 
-            String playerName = player.getName().getString();
-
-            if (golem.isOnAlwaysAttackList(playerName)) { handleUntrustedPlayer(player); continue; }
-            if (golem.isOnIgnoreList(playerName)) continue;
+            // Deny list forces a threat; allow list and ownership (incl. SC teams) exempt.
+            if (golem.isDenied(player)) { handleUntrustedPlayer(player); continue; }
+            if (golem.isAllowed(player)) continue;
             if (golem.isOwner(player)) continue;
-
-            if (SCGuardGolem.isPlayerTrustedByOwner(
-                    //? if >=1.21.10 {
-                    player.getGameProfile().id().toString(),
-                    //?} else
-                    /*player.getGameProfile().getId().toString(),*/
-                    playerName,
-                    golem.getOwnerUUID(),
-                    golem.getOwnerName())) continue;
 
             handleUntrustedPlayer(player);
         }

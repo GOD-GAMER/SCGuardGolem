@@ -32,7 +32,7 @@ public class PlayerThreatGoal extends TargetGoal {
         LivingEntity current = golem.getTarget();
         if (current instanceof Player player && player.isAlive()
                 && !player.isSpectator() && !player.isCreative()
-                && golem.isOnAlwaysAttackList(player.getName().getString())) {
+                && golem.isDenied(player)) {
             targetPlayer = player;
             return true;
         }
@@ -46,10 +46,9 @@ public class PlayerThreatGoal extends TargetGoal {
                 || targetPlayer.isSpectator() || targetPlayer.isCreative()) return false;
         double maxDist = golem.getEffectiveDetectionRadius() * 1.5;
         if (golem.distanceToSqr(targetPlayer) > maxDist * maxDist) return false;
-        String name = targetPlayer.getName().getString();
-        if (golem.isOnIgnoreList(name)) return false;
-        // Attack list overrides owner protection
-        if (golem.isOnAlwaysAttackList(name)) return true;
+        if (golem.isAllowed(targetPlayer)) return false;
+        // Deny list overrides owner protection
+        if (golem.isDenied(targetPlayer)) return true;
         return !golem.isOwner(targetPlayer);
     }
 
@@ -84,7 +83,7 @@ public class PlayerThreatGoal extends TargetGoal {
         Player nearest = null;
         double nearestDistSq = Double.MAX_VALUE;
         for (Player player : nearby) {
-            if (!golem.isOnAlwaysAttackList(player.getName().getString())) continue;
+            if (!golem.isDenied(player)) continue;
             if (!golem.getSensing().hasLineOfSight(player)) continue;
             double distSq = golem.distanceToSqr(player);
             if (distSq < nearestDistSq) { nearestDistSq = distSq; nearest = player; }

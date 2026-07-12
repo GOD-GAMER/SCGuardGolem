@@ -380,10 +380,4 @@ public class SCGuardGolem {
             return false;
         }
     }
-
-    public static boolean isPlayerTrustedByOwner(String playerUUID, String playerName,
-                                                  String ownerUUID, String ownerName) {
-        if (!scLoaded || ownerUUID == null || ownerUUID.isEmpty()) return false;
-        return ownerUUID.equals(playerUUID);
-    }
 }

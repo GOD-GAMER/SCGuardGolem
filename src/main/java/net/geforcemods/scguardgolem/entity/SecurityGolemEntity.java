@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
 
 import net.geforcemods.scguardgolem.SCGContent;
 import net.geforcemods.scguardgolem.SCGuardGolem;
@@ -71,15 +70,13 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
             SynchedEntityData.defineId(SecurityGolemEntity.class, Owner.getSerializer());
     private static final EntityDataAccessor<Integer> THREAT_MODE =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<String> IGNORE_LIST_DATA =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
-    private static final EntityDataAccessor<String> ATTACK_LIST_DATA =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
     // SecurityCraft module inventory (api.IModuleInventory). Modules are BINARY —
-    // present = full effect; SC modules don't stack (b3 adds ALLOWLIST/DENYLIST here).
+    // present = full effect; SC modules don't stack.
     public static final ModuleType[] ACCEPTED_MODULES = {
-        ModuleType.HARMING, ModuleType.SPEED, ModuleType.SMART, ModuleType.STORAGE
+        ModuleType.HARMING, ModuleType.SPEED, ModuleType.SMART, ModuleType.STORAGE,
+        ModuleType.ALLOWLIST, ModuleType.DENYLIST
     };
+
     public static final int MODULE_SLOTS = ACCEPTED_MODULES.length;
 
     public static final int MAX_LOOT_ROWS = 6;
@@ -121,10 +118,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     // Loot item filter (item registry names)
     private final LinkedHashSet<String> lootFilter = new LinkedHashSet<>();
 
-    // Name-based allow/deny lists
-    public static final int MAX_LIST_ENTRIES = 8;
-    private final TreeSet<String> ignoreList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-    private final TreeSet<String> attackList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
     // Bell recall state
     private boolean recalling = false;
@@ -158,8 +151,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         builder.define(PATROLLING, false);
         builder.define(OWNER, new Owner());
         builder.define(THREAT_MODE, ThreatMode.WARN.ordinal());
-        builder.define(IGNORE_LIST_DATA, "");
-        builder.define(ATTACK_LIST_DATA, "");
     }
     //?} else {
     /*@Override
@@ -168,8 +159,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         entityData.define(PATROLLING, false);
         entityData.define(OWNER, new Owner());
         entityData.define(THREAT_MODE, ThreatMode.WARN.ordinal());
-        entityData.define(IGNORE_LIST_DATA, "");
-        entityData.define(ATTACK_LIST_DATA, "");
     }
     *///?}
 
@@ -376,52 +365,11 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         if (s != null) s.setBaseValue(hasSpeedModule() ? FAST_SPEED : BASE_SPEED);
     }
 
-    // -- Name-based allow/deny lists --
-    public boolean isOnIgnoreList(String name) { return ignoreList.contains(name); }
-    public boolean isOnAlwaysAttackList(String name) { return attackList.contains(name); }
-    public Set<String> getIgnoreListNames() {
-        if (level() != null && level().isClientSide()) {
-            String data = entityData.get(IGNORE_LIST_DATA);
-            if (data.isEmpty()) return Set.of();
-            TreeSet<String> set = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (String s : data.split("\0")) if (!s.isEmpty()) set.add(s);
-            return set;
-        }
-        return Collections.unmodifiableSet(ignoreList);
-    }
-    public Set<String> getAlwaysAttackListNames() {
-        if (level() != null && level().isClientSide()) {
-            String data = entityData.get(ATTACK_LIST_DATA);
-            if (data.isEmpty()) return Set.of();
-            TreeSet<String> set = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (String s : data.split("\0")) if (!s.isEmpty()) set.add(s);
-            return set;
-        }
-        return Collections.unmodifiableSet(attackList);
-    }
-
-    private void syncLists() {
-        entityData.set(IGNORE_LIST_DATA, String.join("\0", ignoreList));
-        entityData.set(ATTACK_LIST_DATA, String.join("\0", attackList));
-    }
-
-    public boolean addToIgnoreList(String name) {
-        if (name == null || name.isBlank() || ignoreList.size() >= MAX_LIST_ENTRIES) return false;
-        attackList.remove(name);
-        boolean added = ignoreList.add(name);
-        syncLists();
-        return added;
-    }
-    public boolean removeFromIgnoreList(String name) { boolean r = ignoreList.remove(name); syncLists(); return r; }
-
-    public boolean addToAttackList(String name) {
-        if (name == null || name.isBlank() || attackList.size() >= MAX_LIST_ENTRIES) return false;
-        ignoreList.remove(name);
-        boolean added = attackList.add(name);
-        syncLists();
-        return added;
-    }
-    public boolean removeFromAttackList(String name) { boolean r = attackList.remove(name); syncLists(); return r; }
+    // -- Allow/deny via SecurityCraft ALLOWLIST/DENYLIST modules (api.IModuleInventory) --
+    // isAllowed(Entity) / isDenied(Entity) are inherited defaults, backed by the list
+    // module data (ListModuleData on 1.21.1+, ModuleItem NBT on 1.20.x — absorbed by SC).
+    public boolean hasAllowlistModule() { return isModuleEnabled(ModuleType.ALLOWLIST); }
+    public boolean hasDenylistModule()  { return isModuleEnabled(ModuleType.DENYLIST); }
 
     // -- Loot Inventory --
     public SimpleContainer getLootInventory() { return lootInventory; }
@@ -629,15 +577,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
         tag.store("LootFilter", CompoundTag.CODEC, filterTag);
 
-        CompoundTag listsTag = new CompoundTag();
-        listsTag.putInt("IgnoreCount", ignoreList.size());
-        int idx = 0;
-        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
-        listsTag.putInt("AttackCount", attackList.size());
-        idx = 0;
-        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
-        tag.store("AllowDenyLists", CompoundTag.CODEC, listsTag);
-
         CompoundTag waypointTag = new CompoundTag();
         waypointTag.putInt("Count", waypoints.size());
         for (int i = 0; i < waypoints.size(); i++) {
@@ -678,16 +617,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
             int fc = ft.getIntOr("Count", 0);
             for (int i = 0; i < fc; i++) { String id = ft.getStringOr("Filter" + i, ""); if (!id.isEmpty()) lootFilter.add(id); }
         });
-
-        ignoreList.clear();
-        attackList.clear();
-        tag.read("AllowDenyLists", CompoundTag.CODEC).ifPresent(lt -> {
-            int ic = lt.getIntOr("IgnoreCount", 0);
-            for (int i = 0; i < ic; i++) { String n = lt.getStringOr("Ignore" + i, ""); if (!n.isEmpty()) ignoreList.add(n); }
-            int ac = lt.getIntOr("AttackCount", 0);
-            for (int i = 0; i < ac; i++) { String n = lt.getStringOr("Attack" + i, ""); if (!n.isEmpty()) attackList.add(n); }
-        });
-        syncLists();
 
         waypoints.clear();
         waypointsView = null;
@@ -731,15 +660,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         int fi = 0;
         for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
         tag.put("LootFilter", filterTag);
-
-        CompoundTag listsTag = new CompoundTag();
-        listsTag.putInt("IgnoreCount", ignoreList.size());
-        int idx = 0;
-        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
-        listsTag.putInt("AttackCount", attackList.size());
-        idx = 0;
-        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
-        tag.put("AllowDenyLists", listsTag);
 
         CompoundTag waypointTag = new CompoundTag();
         waypointTag.putInt("Count", waypoints.size());
@@ -826,15 +746,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         int fi = 0;
         for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
         tag.put("LootFilter", filterTag);
-
-        CompoundTag listsTag = new CompoundTag();
-        listsTag.putInt("IgnoreCount", ignoreList.size());
-        int idx = 0;
-        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
-        listsTag.putInt("AttackCount", attackList.size());
-        idx = 0;
-        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
-        tag.put("AllowDenyLists", listsTag);
 
         CompoundTag waypointTag = new CompoundTag();
         waypointTag.putInt("Count", waypoints.size());
@@ -929,17 +840,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
             int fc = ft.getInt("Count");
             for (int i = 0; i < fc; i++) { String id = ft.getString("Filter" + i); if (!id.isEmpty()) lootFilter.add(id); }
         }
-
-        ignoreList.clear();
-        attackList.clear();
-        if (tag.contains("AllowDenyLists")) {
-            CompoundTag lt = tag.getCompound("AllowDenyLists");
-            int ic = lt.getInt("IgnoreCount");
-            for (int i = 0; i < ic; i++) { String n = lt.getString("Ignore" + i); if (!n.isEmpty()) ignoreList.add(n); }
-            int ac = lt.getInt("AttackCount");
-            for (int i = 0; i < ac; i++) { String n = lt.getString("Attack" + i); if (!n.isEmpty()) attackList.add(n); }
-        }
-        syncLists();
 
         waypoints.clear();
         waypointNames.clear();

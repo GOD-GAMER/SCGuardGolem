@@ -187,10 +187,8 @@ public class SCGCommands {
                 + "\u00a7f Speed:\u00a7e" + (g.hasSpeedModule() ? "yes" : "no")
                 + "\u00a7f Smart:\u00a7e" + (g.hasSmartModule() ? "yes" : "no")
                 + "\u00a7f Storage:\u00a7e" + (g.hasStorageModule() ? "yes" : "no"));
-        Set<String> ignore = g.getIgnoreListNames();
-        Set<String> attack = g.getAlwaysAttackListNames();
-        msg(ctx, "Ignore: \u00a77" + (ignore.isEmpty() ? "(empty)" : String.join(", ", ignore)));
-        msg(ctx, "Attack: \u00a77" + (attack.isEmpty() ? "(empty)" : String.join(", ", attack)));
+        msg(ctx, "Allowlist module: \u00a77" + (g.hasAllowlistModule() ? "installed" : "none"));
+        msg(ctx, "Denylist module: \u00a77" + (g.hasDenylistModule() ? "installed" : "none"));
         return 1;
     }
 
