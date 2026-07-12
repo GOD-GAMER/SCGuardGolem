@@ -174,9 +174,14 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     private int x(int i, int tabW) { return leftPos + i * tabW; }
     private int tabWidth(int i, int tabW) { return (i == 3) ? W - tabW * 3 : tabW; }
 
-    // Scroll support
+    // Scroll support (horizontal scrollX param added in MC 1.20.2)
+    //? if >=1.20.2 {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+    //?} else {
+    /*@Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
+    *///?}
         if (menu.getCurrentTab() == GolemMenu.TAB_LISTS) {
             int maxPickerScroll = Math.max(0, pickerEntries.size() - getPickerVisibleCount(calcPickerStartY(topPos)));
             if (maxPickerScroll > 0) {
@@ -197,7 +202,10 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             }
             return true;
         }
+        //? if >=1.20.2 {
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        //?} else
+        /*return super.mouseScrolled(mouseX, mouseY, scrollY);*/
     }
 
     //? if >=26.1 {

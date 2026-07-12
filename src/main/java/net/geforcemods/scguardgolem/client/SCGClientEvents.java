@@ -2,19 +2,21 @@ package net.geforcemods.scguardgolem.client;
 
 import net.geforcemods.scguardgolem.SCGContent;
 import net.geforcemods.scguardgolem.SCGuardGolem;
-import net.neoforged.api.distmarker.Dist;
 //? if forge {
 /*import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.client.event.EntityRenderersEvent;
-import net.minecraftforge.client.event.RegisterMenuScreensEvent;
+import net.minecraft.client.gui.screens.MenuScreens;
 *///?} elif <1.21.1 {
-/*import net.neoforged.bus.api.SubscribeEvent;
+/*import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 *///?} else {
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
@@ -35,8 +37,17 @@ public class SCGClientEvents {
         event.registerEntityRenderer(SCGContent.SECURITY_GOLEM.get(), SecurityGolemRenderer::new);
     }
 
+    //? if forge {
+    /*// Forge 1.20.1 has no RegisterMenuScreensEvent — register in client setup.
+    @SubscribeEvent
+    public static void onClientSetup(FMLClientSetupEvent event) {
+        event.enqueueWork(() ->
+                MenuScreens.register(SCGContent.GOLEM_MENU.get(), GolemScreen::new));
+    }
+    *///?} else {
     @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(SCGContent.GOLEM_MENU.get(), GolemScreen::new);
     }
+    //?}
 }

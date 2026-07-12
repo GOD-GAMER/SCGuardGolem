@@ -62,7 +62,7 @@ public class SCGContent {
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(ForgeRegistries.ITEMS, SCGuardGolem.MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
-            DeferredRegister.create(ForgeRegistries.CREATIVE_MODE_TABS, SCGuardGolem.MODID);
+            DeferredRegister.create(Registries.CREATIVE_MODE_TAB, SCGuardGolem.MODID);
     public static final DeferredRegister<MenuType<?>> MENU_TYPES =
             DeferredRegister.create(ForgeRegistries.MENU_TYPES, SCGuardGolem.MODID);
     *///?} else {
