@@ -56,16 +56,47 @@ jobs:
         run: ./gradlew ":${{ matrix.target }}:build" --console=plain --stacktrace
         timeout-minutes: 40
 
-      # ---- RUNG 2: LOAD — boot a dedicated server so the loader validates
-      # the generated dependency ranges against the real artifacts. `stop` is
-      # consumed once the console thread is up, i.e. after mod load completed.
-      # A range mismatch or mod-load error exits non-zero and fails the step.
+      # ---- RUNG 2: LOAD — boot a dedicated server so the loader validates the
+      # generated dependency ranges against the real artifacts and the mod
+      # actually loads. We do NOT pipe `stop`: on the newest servers (26.x /
+      # 1.21.11 betas) the `stop` console command throws inside vanilla command
+      # handling (CommandSourceStack.getLevel() is null), so the server never
+      # exits and the step hangs to its timeout. Instead, boot in the background,
+      # watch the log for the vanilla "Done (Xs)! For help" marker — printed only
+      # AFTER mod load completes — then tear the server down ourselves. A
+      # mod-load error or range mismatch never reaches that marker, so the step
+      # still fails (this is what caught the "Item id not set" bug on 1.21.2+).
       - name: "Rung 2: server boot"
+        timeout-minutes: 15
         run: |
-          mkdir -p "versions/${{ matrix.target }}/run/server"
-          echo "eula=true" > "versions/${{ matrix.target }}/run/server/eula.txt"
-          echo "stop" | ./gradlew ":${{ matrix.target }}:runServer" --console=plain
-        timeout-minutes: 30
+          set +e
+          RUN_DIR="versions/${{ matrix.target }}/run/server"
+          mkdir -p "$RUN_DIR"
+          echo "eula=true" > "$RUN_DIR/eula.txt"
+          ./gradlew ":${{ matrix.target }}:runServer" --console=plain > server.log 2>&1 &
+          GPID=$!
+          RESULT=timeout
+          for i in $(seq 1 240); do
+            if grep -qE 'Done \(.*\)! For help' server.log; then RESULT=ok; break; fi
+            if ! kill -0 "$GPID" 2>/dev/null; then RESULT=exited; break; fi
+            sleep 2
+          done
+          # Tear down the server + gradle daemon; never let a stray kill abort
+          # the step (GitHub runs each step under `bash -e`).
+          kill "$GPID" 2>/dev/null || true
+          pkill -P "$GPID" 2>/dev/null || true
+          pkill -f 'net.minecraft' 2>/dev/null || true
+          pkill -f 'runServer' 2>/dev/null || true
+          ./gradlew --stop >/dev/null 2>&1 || true
+          echo "----- server.log (tail) -----"
+          tail -n 40 server.log || true
+          echo "----- rung 2 result: $RESULT -----"
+          if [ "$RESULT" = "ok" ]; then
+            echo "Server reached the Done marker: mod loaded and the server booted."
+            exit 0
+          fi
+          echo "Server never reached the Done marker (result=$RESULT) — boot failure."
+          exit 1
 
       # ---- RUNG 3: RUN — gametest smoke suite. Exit code = number of failed
       # required gametests (0 = pass). The cross-version smoke test (convert a
@@ -79,7 +110,7 @@ jobs:
           mkdir -p "versions/${{ matrix.target }}/run/gameTestServer"
           echo "eula=true" > "versions/${{ matrix.target }}/run/gameTestServer/eula.txt"
           ./gradlew ":${{ matrix.target }}:runGameTestServer" --console=plain
-        timeout-minutes: 30
+        timeout-minutes: 10
 
       - name: Upload jar
         uses: actions/upload-artifact@v4
