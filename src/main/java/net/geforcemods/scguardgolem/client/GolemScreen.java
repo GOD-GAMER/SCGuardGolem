@@ -104,7 +104,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             Button.builder(getThreatText(), b -> { clickButton(1); b.setMessage(getThreatText()); })
                 .bounds(x + 8 + btnW + btnGap, btnY, btnW, btnH).build());
         clearRouteBtn = addRenderableWidget(
-            Button.builder(Component.literal("§cClear"), b -> clickButton(2))
+            Button.builder(Component.translatable("scguardgolem.gui.clear").withStyle(net.minecraft.ChatFormatting.RED), b -> clickButton(2))
                 .bounds(x + 8 + (btnW + btnGap) * 2, btnY, 40, btnH).build());
 
         switchTab(GolemMenu.TAB_CONFIG);
@@ -240,7 +240,8 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         int curTab = menu.getCurrentTab();
 
         // Draw 4 tabs
-        String[] tabLabels = {"Config", "Loot", "Lists", "Route"};
+        String[] tabLabels = {tr("scguardgolem.gui.tab.config"), tr("scguardgolem.gui.tab.loot"),
+                tr("scguardgolem.gui.tab.lists"), tr("scguardgolem.gui.tab.route")};
         int tabW = W / 4;
         for (int i = 0; i < 4; i++) {
             int tx = x + i * tabW;
@@ -279,10 +280,10 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
         // Title
         String titleText = switch (curTab) {
-            case GolemMenu.TAB_CONFIG -> "Security Golem";
-            case GolemMenu.TAB_LOOT -> "Collected Loot";
-            case GolemMenu.TAB_LISTS -> "Allow / Deny Lists";
-            case GolemMenu.TAB_WAYPOINTS -> "Patrol Route";
+            case GolemMenu.TAB_CONFIG -> tr("scguardgolem.gui.title.config");
+            case GolemMenu.TAB_LOOT -> tr("scguardgolem.gui.title.loot");
+            case GolemMenu.TAB_LISTS -> tr("scguardgolem.gui.title.lists");
+            case GolemMenu.TAB_WAYPOINTS -> tr("scguardgolem.gui.title.route");
             default -> "";
         };
         g.text(font, titleText, x + (W - font.width(titleText)) / 2, y + 6, C_TITLE, false);
@@ -302,7 +303,9 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     // ---------- CONFIG TAB ----------
     private void drawConfigTab(Gfx g, int x, int y) {
         // 6 module slots in a 3x2 grid, matching acceptedModules() order.
-        String[] labels = {"Harm", "Speed", "Smart", "Store", "Allow", "Deny"};
+        String[] labels = {tr("scguardgolem.gui.module.harming"), tr("scguardgolem.gui.module.speed"),
+                tr("scguardgolem.gui.module.smart"), tr("scguardgolem.gui.module.storage"),
+                tr("scguardgolem.gui.module.allowlist"), tr("scguardgolem.gui.module.denylist")};
         for (int i = 0; i < labels.length; i++) {
             int col = i % 3;
             int row = i / 3;
@@ -318,24 +321,24 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         int statusY = y + modBottom + 28;
 
         String owner = menu.getGolem().getOwnerName();
-        g.text(font, "Owner: " + (owner.isEmpty() ? "None" : owner), x + 8, statusY, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.owner", owner.isEmpty() ? tr("scguardgolem.gui.owner_none") : owner), x + 8, statusY, C_DIM, false);
 
-        String hp = String.format("HP: %.0f/%.0f", menu.getGolem().getHealth(), menu.getGolem().getMaxHealth());
-        g.text(font, hp, x + 90, statusY, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.stat.hp", String.format("%.0f", menu.getGolem().getHealth()),
+                String.format("%.0f", menu.getGolem().getMaxHealth())), x + 90, statusY, C_DIM, false);
 
         SecurityGolemEntity golem = menu.getGolem();
         double dmg = golem.hasHarmingModule() ? SecurityGolemEntity.HARMING_ATTACK_DAMAGE : SecurityGolemEntity.BASE_ATTACK_DAMAGE;
         double spd = golem.hasSpeedModule() ? SecurityGolemEntity.FAST_SPEED : SecurityGolemEntity.BASE_SPEED;
         double det = golem.getEffectiveDetectionRadius();
-        g.text(font, String.format("Dmg: %.0f", dmg), x + 8, statusY + 12, C_DIM, false);
-        g.text(font, String.format("Spd: %.2f", spd), x + 60, statusY + 12, C_DIM, false);
-        g.text(font, String.format("Det: %.0f", det), x + 118, statusY + 12, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.stat.dmg", String.format("%.0f", dmg)), x + 8, statusY + 12, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.stat.spd", String.format("%.2f", spd)), x + 60, statusY + 12, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.stat.det", String.format("%.0f", det)), x + 118, statusY + 12, C_DIM, false);
 
         int lootCap = menu.getLootRows() * 9;
-        g.text(font, "Loot: " + lootCap + " slots", x + 8, statusY + 24, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.loot_slots", lootCap), x + 8, statusY + 24, C_DIM, false);
 
         String mode = SecurityGolemEntity.ThreatMode.fromOrdinal(menu.getData().get(1)).name();
-        g.text(font, "Mode: " + mode, x + 90, statusY + 24, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.mode", tr("scguardgolem.gui.threat." + mode)), x + 90, statusY + 24, C_DIM, false);
     }
 
     // ---------- LOOT TAB ----------
@@ -382,19 +385,18 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
     private void drawListsTab(Gfx g, int x, int y) {
         int curY = y + 20;
-        g.text(font, "Allow / Deny", x + LIST_X, curY, C_TITLE, false);
+        String allowState = tr(menu.getGolem().hasAllowlistModule() ? "scguardgolem.gui.lists.installed" : "scguardgolem.gui.lists.none");
+        String denyState = tr(menu.getGolem().hasDenylistModule() ? "scguardgolem.gui.lists.installed" : "scguardgolem.gui.lists.none");
+        g.text(font, tr("scguardgolem.gui.title.lists"), x + LIST_X, curY, C_TITLE, false);
         curY += 14;
-        g.text(font, "§aAllowlist §7module: " + (menu.getGolem().hasAllowlistModule() ? "§ainstalled" : "§7none"),
-                x + LIST_X, curY, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.lists.allow", allowState), x + LIST_X, curY, 0xFF55FF55, false);
         curY += 11;
-        g.text(font, "§cDenylist §7module: " + (menu.getGolem().hasDenylistModule() ? "§cinstalled" : "§7none"),
-                x + LIST_X, curY, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.lists.deny", denyState), x + LIST_X, curY, 0xFFFF5555, false);
         curY += 16;
-        g.text(font, "§7Place SecurityCraft", x + LIST_X, curY, C_DIM, false); curY += 10;
-        g.text(font, "§7Allowlist / Denylist", x + LIST_X, curY, C_DIM, false); curY += 10;
-        g.text(font, "§7modules in the Config", x + LIST_X, curY, C_DIM, false); curY += 10;
-        g.text(font, "§7tab, then right-click a", x + LIST_X, curY, C_DIM, false); curY += 10;
-        g.text(font, "§7module to edit its list.", x + LIST_X, curY, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.lists.hint1"), x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, tr("scguardgolem.gui.lists.hint2"), x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, tr("scguardgolem.gui.lists.hint3"), x + LIST_X, curY, C_DIM, false); curY += 10;
+        g.text(font, tr("scguardgolem.gui.lists.hint4"), x + LIST_X, curY, C_DIM, false);
     }
 
     @Override
@@ -422,7 +424,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
         int sepY = y + pInvY - 12;
         g.fill(x + 7, sepY, x + W - 7, sepY + 1, C_SEP);
-        g.text(font, "Inventory", x + 8, sepY + 3, C_DIM, false);
+        g.text(font, tr("scguardgolem.gui.inventory"), x + 8, sepY + 3, C_DIM, false);
 
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
@@ -442,14 +444,19 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
 
     private Component getPatrolText() {
         boolean on = menu.getData().get(0) != 0;
-        return Component.literal(on ? "§2Patrol" : "§4Patrol");
+        return Component.translatable("scguardgolem.gui.patrol")
+                .withStyle(on ? net.minecraft.ChatFormatting.DARK_GREEN : net.minecraft.ChatFormatting.DARK_RED);
     }
 
     private Component getThreatText() {
         int mode = menu.getData().get(1);
         String name = SecurityGolemEntity.ThreatMode.fromOrdinal(mode).name();
-        return Component.literal(name);
+        return Component.translatable("scguardgolem.gui.threat." + name);
     }
+
+    // ---------- localization helpers ----------
+    private static String tr(String key) { return Component.translatable(key).getString(); }
+    private static String tr(String key, Object... args) { return Component.translatable(key, args).getString(); }
 
     // ---------- WAYPOINTS TAB ----------
     // Dwell-time buttons (rebuilt with list buttons)
@@ -470,7 +477,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         // Read from synced ContainerData so client always shows the live value
         int dwell = menu.getSyncedDwellTicks();
         int dwellSec = dwell / 20;
-        g.text(font, "Dwell time:", x + 8, dwellY + 3, C_TITLE, false);
+        g.text(font, tr("scguardgolem.gui.dwell"), x + 8, dwellY + 3, C_TITLE, false);
         // The actual dwell value, centered between the two buttons drawn by rebuildWaypointButtons
         String dwellVal = dwellSec + "s";
         int valX = x + W - 62; // left edge of the value text area (buttons at W-44 and W-22)
@@ -483,11 +490,11 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         // Waypoint list
         int listY = y + WP_LIST_START_Y;
         if (waypoints.isEmpty()) {
-            g.text(font, "No waypoints set.", x + 8, listY, C_DIM, false);
+            g.text(font, tr("scguardgolem.gui.no_waypoints"), x + 8, listY, C_DIM, false);
             listY += 11;
-            g.text(font, "§7Hold Wire Cutters and", x + 8, listY, C_DIM, false);
+            g.text(font, tr("scguardgolem.gui.waypoint_hint1"), x + 8, listY, C_DIM, false);
             listY += 10;
-            g.text(font, "§7crouch twice to add one.", x + 8, listY, C_DIM, false);
+            g.text(font, tr("scguardgolem.gui.waypoint_hint2"), x + 8, listY, C_DIM, false);
         } else {
             int maxVisible = (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12;
             for (int i = 0; i < Math.min(waypoints.size(), maxVisible); i++) {
@@ -500,11 +507,11 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
                 int col = current ? 0xFF55FF55 : C_TITLE;
                 g.text(font, (current ? "● " : "○ ") + label, x + 8, listY, col, false);
                 // [x] label hint beside the button
-                g.text(font, "§c[x]", x + W - 24, listY, 0xFFFF5555, false);
+                g.text(font, "[x]", x + W - 24, listY, 0xFFFF5555, false);
                 listY += 12;
             }
             if (waypoints.size() > (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12) {
-                g.text(font, "§8... +" + (waypoints.size() - (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12) + " more",
+                g.text(font, tr("scguardgolem.gui.more", waypoints.size() - (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12),
                         x + 8, listY, C_DIM, false);
             }
         }

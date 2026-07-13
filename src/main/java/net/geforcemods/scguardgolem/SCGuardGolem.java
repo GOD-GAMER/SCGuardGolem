@@ -169,7 +169,7 @@ public class SCGuardGolem {
                     openGolemMenu(serverPlayer, golem);
                 }
             } else {
-                msg(player, Component.literal("§c[Security Golem] You are not the owner."));
+                msg(player, Component.translatable("scguardgolem.not_owner").withStyle(net.minecraft.ChatFormatting.RED));
             }
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
@@ -225,7 +225,7 @@ public class SCGuardGolem {
                 g -> g.isOwner(player) && !g.getWaypoints().isEmpty());
         if (!golems.isEmpty()) {
             for (SecurityGolemEntity golem : golems) golem.recallToStart();
-            msg(player, Component.literal("§6[Security Golem] §f" + golems.size() + " golem(s) recalled."));
+            msg(player, Component.translatable("scguardgolem.golem_recalled", golems.size()).withStyle(net.minecraft.ChatFormatting.GOLD));
         }
     }
 
@@ -296,15 +296,14 @@ public class SCGuardGolem {
                 .orElse(null);
 
         if (nearest == null) {
-            msg(player, Component.literal("§c[Route] No nearby Security Golem found (within 64 blocks)."));
+            msg(player, Component.translatable("scguardgolem.route.no_golem").withStyle(net.minecraft.ChatFormatting.RED));
             return;
         }
 
         BlockPos pos = player.blockPosition();
         nearest.addWaypoint(pos);
         int num = nearest.getWaypoints().size();
-        msg(player, Component.literal(
-                "§6[Route] §aWaypoint #" + num + " placed at §f" + pos.toShortString()));
+        msg(player, Component.translatable("scguardgolem.route.waypoint_placed", num, pos.toShortString()).withStyle(net.minecraft.ChatFormatting.GOLD));
 
         // Burst of happy-villager particles visible to the placing player
         if (player instanceof ServerPlayer sp) {

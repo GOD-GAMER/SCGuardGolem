@@ -325,7 +325,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
                 }
                 return InteractionResult.SUCCESS;
             } else {
-                SCGuardGolem.msg(player, Component.literal("§c[Security Golem] You are not the owner."));
+                SCGuardGolem.msg(player, Component.translatable("scguardgolem.not_owner").withStyle(net.minecraft.ChatFormatting.RED));
             }
         }
         return InteractionResult.PASS;
