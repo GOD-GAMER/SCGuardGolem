@@ -60,7 +60,13 @@ public final class SCGManualPages {
     }
     //?} else {
     /*public static void onInterModProcess(InterModProcessEvent event) {
-        addPageIfAbsent();
+        // InterModProcessEvent is a PARALLEL dispatch phase: sibling mods run
+        // their process_imc handlers on other threads and SecurityCraft is
+        // populating the same static SCManualItem.PAGES list concurrently.
+        // Touching PAGES here directly raced their .add() and threw
+        // ConcurrentModificationException. Defer to the sync executor so the
+        // stream()+add() runs single-threaded after the parallel phase.
+        event.enqueueWork(SCGManualPages::addPageIfAbsent);
     }
     *///?}
 }
