@@ -96,6 +96,7 @@ public class SCGuardGolem {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
         modBus.addListener(SCGuardGolem::onInterModEnqueue);
+        modBus.addListener(SCGManualPages::onInterModProcess);
         LOGGER.info("SecurityCraft Guard Golem addon initialized");
     }
     *///?} else {
@@ -103,6 +104,11 @@ public class SCGuardGolem {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
         modBus.addListener(SCGuardGolem::onInterModEnqueue);
+        //? if >=1.21.8 {
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                SCGManualPages.syncPriority(), SCGManualPages::onDatapackSync);
+        //?} else
+        /*modBus.addListener(SCGManualPages::onInterModProcess);*/
         LOGGER.info("SecurityCraft Guard Golem addon initialized");
     }
     //?}

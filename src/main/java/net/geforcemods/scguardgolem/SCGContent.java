@@ -3,8 +3,6 @@ package net.geforcemods.scguardgolem;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.geforcemods.scguardgolem.item.SCGManualItem;
-//? if >=1.20.5
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 //? if >=1.21.8 {
@@ -108,34 +106,24 @@ public class SCGContent {
             MENU_TYPES.register("golem_menu", () -> IMenuTypeExtension.create(GolemMenu::new));
     //?}
 
-    // Manual item. Divergences across the range:
-    //  - pre-1.20.5: no data components; pages attach via item NBT (SCGManualItem).
-    //  - MC 1.21.2+: Item.Properties must carry a registry id (setId), else the
-    //    generic DeferredRegister path throws "Item id not set" at registration.
-    //    (Boundary written as 1.21.8 to match this matrix; no 1.21.2-1.21.7 target.)
-    // This whole item is replaced by a native SecurityCraft SCManualPage later.
+    // "Open the guide" item — opens SecurityCraft's Manual (the golem's page is a
+    // native SCManualPage registered by SCGManualPages). MC 1.21.2+ requires a
+    // registry id in Item.Properties (setId), else the generic DeferredRegister
+    // path throws "Item id not set" (boundary written as 1.21.8 — no 1.21.2-1.21.7 target).
     //? if forge {
     /*public static final RegistryObject<SCGManualItem> SCG_MANUAL =
-            ITEMS.register("scg_manual", () ->
-                    new SCGManualItem(new Item.Properties().stacksTo(1)));
-    *///?} elif <1.20.5 {
-    /*public static final DeferredHolder<Item, SCGManualItem> SCG_MANUAL =
             ITEMS.register("scg_manual", () ->
                     new SCGManualItem(new Item.Properties().stacksTo(1)));
     *///?} elif <1.21.8 {
     /*public static final DeferredHolder<Item, SCGManualItem> SCG_MANUAL =
             ITEMS.register("scg_manual", () ->
-                    new SCGManualItem(new Item.Properties().stacksTo(1)
-                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
-                                    SCGManualItem.buildManualContent())));
+                    new SCGManualItem(new Item.Properties().stacksTo(1)));
     *///?} else {
     public static final DeferredHolder<Item, SCGManualItem> SCG_MANUAL =
             ITEMS.register("scg_manual", () ->
                     new SCGManualItem(new Item.Properties().stacksTo(1)
                             .setId(ResourceKey.create(Registries.ITEM,
-                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "scg_manual")))
-                            .component(DataComponents.WRITTEN_BOOK_CONTENT,
-                                    SCGManualItem.buildManualContent())));
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "scg_manual")))));
     //?}
 
     //? if forge {
