@@ -214,7 +214,8 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
                 .anyMatch(check -> check.canAttack(entity));
     }
 
-    // -- IEMPAffected (responds to SecurityCraft EMP like the Sentry) --
+    // -- IEMPAffected: shut down by any EMP (the addon's EMP Gun, or another
+    //    mod's) exactly like SecurityCraft's own devices; reactivate with redstone. --
     @Override
     public void shutDown() {
         setShutDown(true); // IEMPAffected default body (can't use I.super via the aggregate interface)

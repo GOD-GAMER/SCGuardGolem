@@ -2,6 +2,9 @@
   "entity.scguardgolem.security_golem": "Security Guard Golem",
   "entity.scguardgolem.tamed_guard": "Tamed Guard",
   "item.scguardgolem.scg_manual": "Security Golem Guide",
+  "item.scguardgolem.emp_gun": "EMP Gun",
+  "item.scguardgolem.emp_gun_powered": "Charged EMP Gun",
+  "scguardgolem.emp_gun.tooltip": "Fires an EMP pulse that shuts down guards and SecurityCraft devices. Crouch with redstone to charge.",
   "itemGroup.scguardgolem": "Security Guard Golem",
 
   "scguardgolem.tamed_guard": "Tamed Guard",
@@ -44,7 +47,7 @@
   "scguardgolem.route.waypoint_placed": "[Route] Waypoint #%s placed at %s",
 
   "scguardgolem.manual.title": "Security Guard Golem",
-  "scguardgolem.manual.help": "Convert a vanilla Iron Golem into an owned guard by right-clicking it with any SecurityCraft Keycard. The keycard is consumed and you become the owner.\n\nRight-click your golem with SecurityCraft Wire Cutters to open its config screen: install modules (Harming, Speed, Smart, Storage) and SecurityCraft Allowlist/Denylist modules, toggle patrol and threat mode, and lay out a patrol route.\n\nWhile holding Wire Cutters, crouch twice within 1.5 seconds to drop a route waypoint at your feet. Right-click a Bell within 64 blocks to recall your golems to their first waypoint.\n\nBare-hand right-click opens the passcode-protected loot; crouch + bare-hand as the owner to set the passcode. The golem responds to EMP like other SecurityCraft devices — reactivate a shut-down golem with redstone.",
+  "scguardgolem.manual.help": "Convert a vanilla Iron Golem into an owned guard by right-clicking it with any SecurityCraft Keycard. The keycard is consumed and you become the owner.\n\nRight-click your golem with SecurityCraft Wire Cutters to open its config screen: install modules (Harming, Speed, Smart, Storage) and SecurityCraft Allowlist/Denylist modules, toggle patrol and threat mode, and lay out a patrol route.\n\nWhile holding Wire Cutters, crouch twice within 1.5 seconds to drop a route waypoint at your feet. Right-click a Bell within 64 blocks to recall your golems to their first waypoint.\n\nBare-hand right-click opens the passcode-protected loot; crouch + bare-hand as the owner to set the passcode. An EMP shuts the golem down — use the addon's EMP Gun (or any mod's EMP) — just like SecurityCraft's own devices; reactivate a shut-down golem by right-clicking it with redstone.",
 
   "scguardgolem.gui.title": "Security Golem Configuration",
   "scguardgolem.gui.tab.config": "Config",

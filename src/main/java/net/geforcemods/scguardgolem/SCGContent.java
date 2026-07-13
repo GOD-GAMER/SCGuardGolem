@@ -3,6 +3,7 @@ package net.geforcemods.scguardgolem;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.entity.TamedGuardEntity;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import net.geforcemods.scguardgolem.item.EmpGunItem;
 import net.geforcemods.scguardgolem.item.SCGManualItem;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -151,13 +152,47 @@ public class SCGContent {
                                     Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "scg_manual")))));
     //?}
 
+    // EMP gun (base + redstone-charged "powered") — a real in-world trigger for
+    // the IEMPAffected shutdown path; SecurityCraft ships no EMP itself. Texture
+    // derived from SecurityCraft's taser (MIT) — see CREDITS.md.
+    //? if forge {
+    /*public static final RegistryObject<EmpGunItem> EMP_GUN =
+            ITEMS.register("emp_gun", () ->
+                    new EmpGunItem(new Item.Properties().durability(200), false));
+    public static final RegistryObject<EmpGunItem> EMP_GUN_POWERED =
+            ITEMS.register("emp_gun_powered", () ->
+                    new EmpGunItem(new Item.Properties().durability(200), true));
+    *///?} elif <1.21.8 {
+    /*public static final DeferredHolder<Item, EmpGunItem> EMP_GUN =
+            ITEMS.register("emp_gun", () ->
+                    new EmpGunItem(new Item.Properties().durability(200), false));
+    public static final DeferredHolder<Item, EmpGunItem> EMP_GUN_POWERED =
+            ITEMS.register("emp_gun_powered", () ->
+                    new EmpGunItem(new Item.Properties().durability(200), true));
+    *///?} else {
+    public static final DeferredHolder<Item, EmpGunItem> EMP_GUN =
+            ITEMS.register("emp_gun", () ->
+                    new EmpGunItem(new Item.Properties().durability(200)
+                            .setId(ResourceKey.create(Registries.ITEM,
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "emp_gun"))), false));
+    public static final DeferredHolder<Item, EmpGunItem> EMP_GUN_POWERED =
+            ITEMS.register("emp_gun_powered", () ->
+                    new EmpGunItem(new Item.Properties().durability(200)
+                            .setId(ResourceKey.create(Registries.ITEM,
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "emp_gun_powered"))), true));
+    //?}
+
     //? if forge {
     /*public static final RegistryObject<CreativeModeTab> SCG_TAB =
             CREATIVE_MODE_TABS.register("scguardgolem", () -> CreativeModeTab.builder()
                     .withTabsBefore(CreativeModeTabs.SPAWN_EGGS)
                     .icon(() -> new ItemStack(SCG_MANUAL.get()))
                     .title(Component.translatable("itemGroup.scguardgolem"))
-                    .displayItems((params, output) -> output.accept(new ItemStack(SCG_MANUAL.get())))
+                    .displayItems((params, output) -> {
+                        output.accept(new ItemStack(SCG_MANUAL.get()));
+                        output.accept(new ItemStack(EMP_GUN.get()));
+                        output.accept(new ItemStack(EMP_GUN_POWERED.get()));
+                    })
                     .build());
     *///?} else {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SCG_TAB =
@@ -165,7 +200,11 @@ public class SCGContent {
                     .withTabsBefore(CreativeModeTabs.SPAWN_EGGS)
                     .icon(() -> new ItemStack(SCG_MANUAL.get()))
                     .title(Component.translatable("itemGroup.scguardgolem"))
-                    .displayItems((params, output) -> output.accept(new ItemStack(SCG_MANUAL.get())))
+                    .displayItems((params, output) -> {
+                        output.accept(new ItemStack(SCG_MANUAL.get()));
+                        output.accept(new ItemStack(EMP_GUN.get()));
+                        output.accept(new ItemStack(EMP_GUN_POWERED.get()));
+                    })
                     .build());
     //?}
 
