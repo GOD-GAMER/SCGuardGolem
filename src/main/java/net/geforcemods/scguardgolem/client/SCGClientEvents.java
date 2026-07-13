@@ -35,6 +35,8 @@ public class SCGClientEvents {
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(SCGContent.SECURITY_GOLEM.get(), SecurityGolemRenderer::new);
+        // Tamed guards extend Zombie, so the vanilla humanoid renderer draws them on every version.
+        event.registerEntityRenderer(SCGContent.TAMED_GUARD.get(), net.minecraft.client.renderer.entity.ZombieRenderer::new);
     }
 
     //? if forge {

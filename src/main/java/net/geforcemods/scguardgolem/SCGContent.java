@@ -1,6 +1,7 @@
 package net.geforcemods.scguardgolem;
 
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
+import net.geforcemods.scguardgolem.entity.TamedGuardEntity;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
 import net.geforcemods.scguardgolem.item.SCGManualItem;
 import net.minecraft.core.registries.Registries;
@@ -99,6 +100,30 @@ public class SCGContent {
     //?}
 
     //? if forge {
+    /*public static final RegistryObject<EntityType<TamedGuardEntity>> TAMED_GUARD =
+            ENTITY_TYPES.register("tamed_guard", () ->
+                    EntityType.Builder.<TamedGuardEntity>of(TamedGuardEntity::new, MobCategory.MONSTER)
+                            .sized(0.6F, 1.95F)
+                            .setTrackingRange(80)
+                            .setUpdateInterval(3)
+                            .setShouldReceiveVelocityUpdates(true)
+                            .build("tamed_guard"));
+    *///?} else {
+    public static final DeferredHolder<EntityType<?>, EntityType<TamedGuardEntity>> TAMED_GUARD =
+            ENTITY_TYPES.register("tamed_guard", () ->
+                    EntityType.Builder.<TamedGuardEntity>of(TamedGuardEntity::new, MobCategory.MONSTER)
+                            .sized(0.6F, 1.95F)
+                            .setTrackingRange(80)
+                            .setUpdateInterval(3)
+                            .setShouldReceiveVelocityUpdates(true)
+                            //? if >=1.21.8 {
+                            .build(ResourceKey.create(Registries.ENTITY_TYPE,
+                                    Identifier.fromNamespaceAndPath(SCGuardGolem.MODID, "tamed_guard"))));
+                            //?} else
+                            /*.build(SCGuardGolem.MODID + ":tamed_guard"));*/
+    //?}
+
+    //? if forge {
     /*public static final RegistryObject<MenuType<GolemMenu>> GOLEM_MENU =
             MENU_TYPES.register("golem_menu", () -> IForgeMenuType.create(GolemMenu::new));
     *///?} else {
@@ -161,6 +186,16 @@ public class SCGContent {
                         .add(Attributes.ATTACK_DAMAGE, 15.0D)
                         //? if >=1.20.5
                         .add(Attributes.STEP_HEIGHT, 1.0D)
+                        .build());
+        event.put(TAMED_GUARD.get(),
+                //? if >=1.21.11 {
+                net.minecraft.world.entity.monster.zombie.Zombie.createAttributes()
+                //?} else
+                /*net.minecraft.world.entity.monster.Zombie.createAttributes()*/
+                        .add(Attributes.MAX_HEALTH, 30.0D)
+                        .add(Attributes.MOVEMENT_SPEED, 0.23D)
+                        .add(Attributes.ATTACK_DAMAGE, 3.0D)
+                        .add(Attributes.SPAWN_REINFORCEMENTS_CHANCE, 0.0D)
                         .build());
     }
 }

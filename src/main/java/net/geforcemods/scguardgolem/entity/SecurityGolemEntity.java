@@ -67,7 +67,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable, IModuleInventory, IEMPAffected, IPasscodeProtected {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGuardEntity {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
@@ -217,7 +217,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     // -- IEMPAffected (responds to SecurityCraft EMP like the Sentry) --
     @Override
     public void shutDown() {
-        IEMPAffected.super.shutDown();
+        setShutDown(true); // IEMPAffected default body (can't use I.super via the aggregate interface)
         setTarget(null);
     }
 

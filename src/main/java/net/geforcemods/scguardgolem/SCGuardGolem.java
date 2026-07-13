@@ -148,6 +148,15 @@ public class SCGuardGolem {
         //?}
     }
 
+    /** Opens a plain MenuProvider (no extra client data) on every loader — used for the tamed guard's loot. */
+    public static void openContainer(ServerPlayer serverPlayer, net.minecraft.world.MenuProvider provider) {
+        //? if forge {
+        /*net.minecraftforge.network.NetworkHooks.openScreen(serverPlayer, provider);
+        *///?} else {
+        serverPlayer.openMenu(provider);
+        //?}
+    }
+
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         SCGCommands.register(event.getDispatcher());
@@ -171,6 +180,15 @@ public class SCGuardGolem {
             } else {
                 msg(player, Component.translatable("scguardgolem.not_owner").withStyle(net.minecraft.ChatFormatting.RED));
             }
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
+            return;
+        }
+
+        // Keycard on an eligible hostile mob → tame it into an owned guard.
+        if (isKeycardItem(held) && event.getTarget() instanceof net.minecraft.world.entity.monster.Monster monster
+                && isTameable(monster)) {
+            tameMob((ServerLevel) event.getLevel(), monster, player, held);
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
             return;
@@ -207,6 +225,35 @@ public class SCGuardGolem {
 
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
+    }
+
+    /** Eligible: a normal hostile mob (not a Creeper, not already a guard, not a boss). */
+    private static boolean isTameable(net.minecraft.world.entity.monster.Monster monster) {
+        if (monster instanceof net.minecraft.world.entity.monster.Creeper) return false;
+        if (monster instanceof net.geforcemods.scguardgolem.entity.TamedGuardEntity) return false;
+        // Boss guard: max health cap excludes Wardens/Withers etc.
+        return monster.getMaxHealth() <= 100.0F;
+    }
+
+    private static void tameMob(ServerLevel level, net.minecraft.world.entity.monster.Monster monster, Player player, ItemStack held) {
+        //? if >=1.21.8 {
+        var guard = SCGContent.TAMED_GUARD.get().create(level, EntitySpawnReason.CONVERSION);
+        //?} else
+        /*var guard = SCGContent.TAMED_GUARD.get().create(level);*/
+        if (guard == null) return;
+
+        //? if >=1.21.8 {
+        guard.snapTo(monster.getX(), monster.getY(), monster.getZ(), monster.getYRot(), monster.getXRot());
+        //?} else {
+        /*guard.moveTo(monster.getX(), monster.getY(), monster.getZ(), monster.getYRot(), monster.getXRot());
+        *///?}
+        guard.setGuardOwner(player);
+        guard.adoptStatsFrom(monster);
+
+        monster.discard();
+        level.addFreshEntity(guard);
+        held.shrink(1);
+        msg(player, Component.translatable("scguardgolem.tamed.success"));
     }
 
     // -----------------------------------------------------------------------

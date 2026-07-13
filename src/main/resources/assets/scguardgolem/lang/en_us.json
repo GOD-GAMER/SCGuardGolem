@@ -1,9 +1,12 @@
 {
   "entity.scguardgolem.security_golem": "Security Guard Golem",
+  "entity.scguardgolem.tamed_guard": "Tamed Guard",
   "item.scguardgolem.scg_manual": "Security Golem Guide",
   "itemGroup.scguardgolem": "Security Guard Golem",
 
+  "scguardgolem.tamed_guard": "Tamed Guard",
   "scguardgolem.conversion.success": "Iron Golem converted into a Security Guard Golem! You are now its owner.",
+  "scguardgolem.tamed.success": "Mob tamed into a guard! You are now its owner. Right-click it with SecurityCraft modules to upgrade it.",
   "scguardgolem.manual.tooltip": "Right-click to open the SecurityCraft Manual",
   "scguardgolem.command.no_golem": "No Security Golem found nearby.",
 
