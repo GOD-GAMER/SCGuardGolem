@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 
 import net.geforcemods.scguardgolem.SCGContent;
+import net.geforcemods.scguardgolem.SCGFx;
 import net.geforcemods.scguardgolem.SCGuardGolem;
 import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
@@ -32,7 +33,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -220,6 +225,21 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
     public void shutDown() {
         setShutDown(true); // IEMPAffected default body (can't use I.super via the aggregate interface)
         setTarget(null);
+        if (level() instanceof ServerLevel sl) {
+            SCGFx.burst(sl, ParticleTypes.LARGE_SMOKE, this, 8, 0.4, 0.02);
+            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, this, 14, 0.4, 0.1);
+            SCGFx.sound(level(), this, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 0.9F, 0.7F);
+        }
+    }
+
+    @Override
+    public void reactivate() {
+        setShutDown(false);
+        if (level() instanceof ServerLevel sl) {
+            SCGFx.burst(sl, ParticleTypes.HAPPY_VILLAGER, this, 10, 0.4, 0.0);
+            SCGFx.burst(sl, ParticleTypes.END_ROD, this, 6, 0.3, 0.02);
+            SCGFx.sound(level(), this, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 0.8F, 1.2F);
+        }
     }
 
     @Override
@@ -236,6 +256,9 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
             if (scanTimer >= SCAN_INTERVAL_TICKS) scanTimer = 0;
             if (pickupCooldown > 0) pickupCooldown--;
             else pickupNearbyItems();
+            // Disabled golems fizzle a little smoke every scan tick until reactivated.
+            if (isShutDown() && scanTimer == 0 && level() instanceof ServerLevel sl)
+                SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
         }
     }
 
@@ -252,6 +275,11 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
                 // Save current waypoint when combat starts
                 savedWaypointIndex = currentWaypointIndex;
                 hadTarget = true;
+                // Alert: one angry puff + a grunt when a threat is first acquired.
+                if (level() instanceof ServerLevel sl) {
+                    SCGFx.burst(sl, ParticleTypes.ANGRY_VILLAGER, getX(), getY() + getBbHeight() + 0.3, getZ(), 4, 0.2, 0.0);
+                    SCGFx.sound(level(), this, SoundEvents.IRON_GOLEM_ATTACK, SoundSource.HOSTILE, 0.8F, 0.9F);
+                }
             } else if (target == null && hadTarget) {
                 // Combat ended — restore waypoint
                 currentWaypointIndex = savedWaypointIndex;

@@ -1,7 +1,12 @@
 package net.geforcemods.scguardgolem.item;
 
 import net.geforcemods.scguardgolem.SCGContent;
+import net.geforcemods.scguardgolem.SCGFx;
 import net.geforcemods.securitycraft.api.IEMPAffected;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -68,13 +73,21 @@ public class EmpGunItem extends Item {
         // Crouch = charge the base gun into the powered variant (creative toggles
         // freely; survival spends one redstone), matching the taser's charge step.
         if (player.isCrouching() && (player.isCreative() || !powered)) {
+            boolean charged = false;
             if (player.isCreative()) {
                 boolean base = stack.getItem() == SCGContent.EMP_GUN.get();
                 player.setItemInHand(hand, new ItemStack(base ? SCGContent.EMP_GUN_POWERED.get() : SCGContent.EMP_GUN.get()));
-                return 1;
-            }
-            if (consumeOneRedstone(player)) {
+                charged = true;
+            } else if (consumeOneRedstone(player)) {
                 player.setItemInHand(hand, new ItemStack(SCGContent.EMP_GUN_POWERED.get()));
+                charged = true;
+            }
+            if (charged) {
+                if (level instanceof ServerLevel sl) {
+                    net.minecraft.world.phys.Vec3 e = player.getEyePosition(1.0F);
+                    SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, e.x, e.y, e.z, 10, 0.25, 0.05);
+                    SCGFx.sound(level, player.getX(), player.getY(), player.getZ(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.PLAYERS, 0.7F, 1.4F);
+                }
                 return 1;
             }
             return 0;
@@ -86,12 +99,33 @@ public class EmpGunItem extends Item {
         AABB box = player.getBoundingBox().expandTowards(look).inflate(1, 1, 1);
         EntityHitResult hit = ProjectileUtil.getEntityHitResult(player, start, end, box, LivingEntity.class::isInstance, RANGE * RANGE);
 
+        // Muzzle flash + a spark beam traced from the barrel to the impact point.
+        if (level instanceof ServerLevel sl) {
+            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, start.x, start.y, start.z, 6, 0.05, 0.02);
+            SCGFx.burst(sl, ParticleTypes.SMOKE, start.x, start.y, start.z, 2, 0.05, 0.01);
+            Vec3 tip = hit != null ? hit.getLocation() : end;
+            int steps = Math.max(1, Math.min((int) start.distanceTo(tip), RANGE));
+            for (int s = 1; s < steps; s++) {
+                double t = (double) s / steps;
+                sl.sendParticles(ParticleTypes.ELECTRIC_SPARK,
+                        start.x + (tip.x - start.x) * t, start.y + (tip.y - start.y) * t, start.z + (tip.z - start.z) * t,
+                        1, 0, 0, 0, 0);
+            }
+            SCGFx.sound(level, player.getX(), player.getY(), player.getZ(), SoundEvents.BLAZE_SHOOT, SoundSource.PLAYERS, 0.7F, 1.6F);
+        }
+
         if (hit != null) {
             LivingEntity target = (LivingEntity) hit.getEntity();
-            if (target instanceof IEMPAffected affected)
-                affected.shutDown();
-            else
+            if (target instanceof IEMPAffected affected) {
+                affected.shutDown(); // the target's own shutDown() plays the EMP burst + power-down sound
+            } else {
                 applyTaseEffects(target);
+                if (level instanceof ServerLevel sl) {
+                    SCGFx.burst(sl, ParticleTypes.CRIT, target, 8, 0.3, 0.1);
+                    SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, target, 6, 0.3, 0.1);
+                    SCGFx.sound(level, target, SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.PLAYERS, 0.4F, 1.8F);
+                }
+            }
         }
 
         // Consume: the powered burst reverts to the base gun after one shot; the

@@ -1,5 +1,6 @@
 package net.geforcemods.scguardgolem.entity;
 
+import net.geforcemods.scguardgolem.SCGFx;
 import net.geforcemods.scguardgolem.SCGuardGolem;
 import net.geforcemods.securitycraft.api.Owner;
 import net.geforcemods.securitycraft.items.ModuleItem;
@@ -11,7 +12,11 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -147,6 +152,8 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
             scanTimer = (scanTimer + 1) % 20;
             if (pickupCooldown > 0) pickupCooldown--;
             else { core.pickupNearbyItems(getBoundingBox().inflate(2.0)); pickupCooldown = 10; }
+            if (isShutDown() && scanTimer == 0 && level() instanceof ServerLevel sl)
+                SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
         }
     }
 
@@ -223,7 +230,25 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
 
     // -- IEMPAffected --
     @Override
-    public void shutDown() { setShutDown(true); setTarget(null); }
+    public void shutDown() {
+        setShutDown(true);
+        setTarget(null);
+        if (level() instanceof ServerLevel sl) {
+            SCGFx.burst(sl, ParticleTypes.LARGE_SMOKE, this, 8, 0.4, 0.02);
+            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, this, 14, 0.4, 0.1);
+            SCGFx.sound(level(), this, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 0.9F, 0.7F);
+        }
+    }
+
+    @Override
+    public void reactivate() {
+        setShutDown(false);
+        if (level() instanceof ServerLevel sl) {
+            SCGFx.burst(sl, ParticleTypes.HAPPY_VILLAGER, this, 10, 0.4, 0.0);
+            SCGFx.burst(sl, ParticleTypes.END_ROD, this, 6, 0.3, 0.02);
+            SCGFx.sound(level(), this, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 0.8F, 1.2F);
+        }
+    }
 
     @Override
     public boolean isShutDown() { return entityData.get(SHUT_DOWN); }
@@ -238,7 +263,12 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
     @Override
     public void setTarget(LivingEntity target) {
         if (isShutDown()) { super.setTarget(null); return; }
+        boolean hadNoTarget = getTarget() == null;
         super.setTarget(target);
+        if (hadNoTarget && target != null && level() instanceof ServerLevel sl) {
+            SCGFx.burst(sl, ParticleTypes.ANGRY_VILLAGER, getX(), getY() + getBbHeight() + 0.3, getZ(), 4, 0.2, 0.0);
+            SCGFx.sound(level(), this, SoundEvents.ZOMBIE_AMBIENT, SoundSource.HOSTILE, 0.9F, 0.7F);
+        }
     }
 
     // -- GuardCore.Host --

@@ -4,13 +4,14 @@
 
 SCGuardGolem is an addon for **SecurityCraft** and integrates against its API.
 
-The EMP Gun item textures (`assets/scguardgolem/textures/item/emp_gun.png` and
-`emp_gun_powered.png`) are **derivative works** of SecurityCraft's taser textures
-(`taser.png` / `taser_powered.png`), recolored to a blue "EMP" palette. The
-`EmpGunItem` behavior is modelled on SecurityCraft's `TaserItem`.
+The EMP Gun item textures are **original** procedurally-generated art (they no
+longer derive from SecurityCraft's taser textures). The `EmpGunItem` *behavior*
+is modelled on SecurityCraft's `TaserItem` (raycast, charge-with-redstone, the
+two-state powered variant), and the mod integrates against SecurityCraft's API
+throughout.
 
 SecurityCraft is distributed under the MIT License. Its notice is reproduced
-below as required.
+below in acknowledgement.
 
 ```
 MIT License

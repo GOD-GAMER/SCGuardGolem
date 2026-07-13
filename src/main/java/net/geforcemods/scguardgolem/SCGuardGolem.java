@@ -14,6 +14,8 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 //? if >=1.21.11
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.InteractionResult;
@@ -219,6 +221,9 @@ public class SCGuardGolem {
 
         ironGolem.discard();
         serverLevel.addFreshEntity(golem);
+        SCGFx.burst(serverLevel, ParticleTypes.HAPPY_VILLAGER, golem, 15, 0.5, 0.0);
+        SCGFx.burst(serverLevel, ParticleTypes.END_ROD, golem, 10, 0.4, 0.02);
+        SCGFx.sound(serverLevel, golem, SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 0.8F, 1.3F);
 
         held.shrink(1);
         msg(player, Component.translatable("scguardgolem.conversion.success"));
@@ -252,6 +257,9 @@ public class SCGuardGolem {
 
         monster.discard();
         level.addFreshEntity(guard);
+        SCGFx.burst(level, ParticleTypes.HEART, guard, 8, 0.4, 0.0);
+        SCGFx.burst(level, ParticleTypes.HAPPY_VILLAGER, guard, 10, 0.4, 0.0);
+        SCGFx.sound(level, guard, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.7F, 1.4F);
         held.shrink(1);
         msg(player, Component.translatable("scguardgolem.tamed.success"));
     }
@@ -271,7 +279,12 @@ public class SCGuardGolem {
         List<SecurityGolemEntity> golems = serverLevel.getEntitiesOfClass(SecurityGolemEntity.class, searchBox,
                 g -> g.isOwner(player) && !g.getWaypoints().isEmpty());
         if (!golems.isEmpty()) {
-            for (SecurityGolemEntity golem : golems) golem.recallToStart();
+            for (SecurityGolemEntity golem : golems) {
+                golem.recallToStart();
+                SCGFx.burst(serverLevel, ParticleTypes.END_ROD, golem, 5, 0.3, 0.02);
+            }
+            BlockPos bell = event.getPos();
+            SCGFx.burst(serverLevel, ParticleTypes.END_ROD, bell.getX() + 0.5, bell.getY() + 1.0, bell.getZ() + 0.5, 10, 0.4, 0.02);
             msg(player, Component.translatable("scguardgolem.golem_recalled", golems.size()).withStyle(net.minecraft.ChatFormatting.GOLD));
         }
     }
