@@ -8,6 +8,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity;
 import net.geforcemods.scguardgolem.entity.SecurityGolemEntity.ThreatMode;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 //? if >=1.21.11
 import net.minecraft.server.permissions.Permissions;
@@ -18,7 +19,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
-import java.util.Set;
 
 public class SCGCommands {
 
@@ -63,7 +63,7 @@ public class SCGCommands {
         List<SecurityGolemEntity> golems = ctx.getSource().getLevel()
                 .getEntitiesOfClass(SecurityGolemEntity.class, box, e -> true);
         if (golems.isEmpty()) {
-            ctx.getSource().sendFailure(Component.translatable("scguardgolem.command.no_golem"));
+            fail(ctx, "scguardgolem.command.no_golem");
             return null;
         }
         SecurityGolemEntity nearest = null;
@@ -75,19 +75,30 @@ public class SCGCommands {
         return nearest;
     }
 
-    private static void msg(CommandContext<CommandSourceStack> ctx, String text) {
-        ctx.getSource().sendSuccess(() -> Component.literal("\u00a76[Security Golem] \u00a7f" + text), false);
+    /** Prefixed, coloured success line built from a translatable key + args. */
+    private static void msg(CommandContext<CommandSourceStack> ctx, String key, Object... args) {
+        Component body = Component.translatable(key, args).withStyle(ChatFormatting.WHITE);
+        Component line = Component.translatable("scguardgolem.cmd.prefix").withStyle(ChatFormatting.GOLD).append(body);
+        ctx.getSource().sendSuccess(() -> line, false);
+    }
+
+    private static void fail(CommandContext<CommandSourceStack> ctx, String key) {
+        ctx.getSource().sendFailure(Component.translatable(key).withStyle(ChatFormatting.RED));
+    }
+
+    private static Component yesNo(boolean value) {
+        return Component.translatable(value ? "scguardgolem.cmd.yes" : "scguardgolem.cmd.no");
     }
 
     private static int patrolStart(CommandContext<CommandSourceStack> ctx) {
         SecurityGolemEntity g = requireGolem(ctx);
         if (g == null) return 0;
         if (g.getWaypoints().isEmpty()) {
-            ctx.getSource().sendFailure(Component.literal("\u00a7cAdd waypoints first."));
+            fail(ctx, "scguardgolem.cmd.add_waypoints_first");
             return 0;
         }
         g.setPatrolling(true);
-        msg(ctx, "Patrol \u00a7astarted\u00a7f.");
+        msg(ctx, "scguardgolem.cmd.patrol_started");
         return 1;
     }
 
@@ -95,7 +106,7 @@ public class SCGCommands {
         SecurityGolemEntity g = requireGolem(ctx);
         if (g == null) return 0;
         g.setPatrolling(false);
-        msg(ctx, "Patrol \u00a7cstopped\u00a7f.");
+        msg(ctx, "scguardgolem.cmd.patrol_stopped");
         return 1;
     }
 
@@ -104,7 +115,7 @@ public class SCGCommands {
         if (g == null) return 0;
         double speed = DoubleArgumentType.getDouble(ctx, "value");
         g.setPatrolSpeed(speed);
-        msg(ctx, "Patrol speed set to \u00a7e" + String.format("%.2f", speed) + "\u00a7f.");
+        msg(ctx, "scguardgolem.cmd.patrol_speed", String.format("%.2f", speed));
         return 1;
     }
 
@@ -116,7 +127,7 @@ public class SCGCommands {
                 IntegerArgumentType.getInteger(ctx, "y"),
                 IntegerArgumentType.getInteger(ctx, "z"));
         g.addWaypoint(pos);
-        msg(ctx, "Waypoint #" + (g.getWaypoints().size() - 1) + " added at " + pos.toShortString() + ".");
+        msg(ctx, "scguardgolem.cmd.waypoint_added", g.getWaypoints().size() - 1, pos.toShortString());
         return 1;
     }
 
@@ -125,7 +136,7 @@ public class SCGCommands {
         if (g == null) return 0;
         BlockPos bp = BlockPos.containing(ctx.getSource().getPosition());
         g.addWaypoint(bp);
-        msg(ctx, "Waypoint #" + (g.getWaypoints().size() - 1) + " added at " + bp.toShortString() + ".");
+        msg(ctx, "scguardgolem.cmd.waypoint_added", g.getWaypoints().size() - 1, bp.toShortString());
         return 1;
     }
 
@@ -133,8 +144,8 @@ public class SCGCommands {
         SecurityGolemEntity g = requireGolem(ctx);
         if (g == null) return 0;
         int index = IntegerArgumentType.getInteger(ctx, "index");
-        if (g.removeWaypoint(index)) msg(ctx, "Waypoint #" + index + " removed.");
-        else ctx.getSource().sendFailure(Component.literal("\u00a7cInvalid waypoint index."));
+        if (g.removeWaypoint(index)) msg(ctx, "scguardgolem.cmd.waypoint_removed", index);
+        else fail(ctx, "scguardgolem.cmd.invalid_waypoint");
         return 1;
     }
 
@@ -143,7 +154,7 @@ public class SCGCommands {
         if (g == null) return 0;
         g.clearWaypoints();
         g.setPatrolling(false);
-        msg(ctx, "All waypoints cleared. Patrol stopped.");
+        msg(ctx, "scguardgolem.cmd.waypoints_cleared");
         return 1;
     }
 
@@ -152,14 +163,14 @@ public class SCGCommands {
         if (g == null) return 0;
         List<BlockPos> wps = g.getWaypoints();
         if (wps.isEmpty()) {
-            msg(ctx, "No waypoints set.");
+            msg(ctx, "scguardgolem.cmd.no_waypoints");
         } else {
-            msg(ctx, "Waypoints (" + wps.size() + "):");
+            msg(ctx, "scguardgolem.cmd.waypoints_header", wps.size());
             for (int i = 0; i < wps.size(); i++) {
-                final int idx = i;
-                String marker = (i == g.getCurrentWaypointIndex()) ? " \u00a7a<- current" : "";
-                ctx.getSource().sendSuccess(() -> Component.literal(
-                        "  \u00a77#" + idx + " \u00a7f" + wps.get(idx).toShortString() + marker), false);
+                boolean current = (i == g.getCurrentWaypointIndex());
+                Component entry = Component.translatable("scguardgolem.cmd.waypoint_entry", i, wps.get(i).toShortString())
+                        .withStyle(current ? ChatFormatting.GREEN : ChatFormatting.GRAY);
+                ctx.getSource().sendSuccess(() -> entry, false);
             }
         }
         return 1;
@@ -169,26 +180,28 @@ public class SCGCommands {
         SecurityGolemEntity g = requireGolem(ctx);
         if (g == null) return 0;
         g.setThreatMode(mode);
-        msg(ctx, "Threat mode set to \u00a7e" + mode.name() + "\u00a7f.");
+        msg(ctx, "scguardgolem.cmd.threat_set", Component.translatable("scguardgolem.gui.threat." + mode.name()));
         return 1;
     }
 
     private static int showStatus(CommandContext<CommandSourceStack> ctx) {
         SecurityGolemEntity g = requireGolem(ctx);
         if (g == null) return 0;
-        msg(ctx, "\u00a76--- Security Golem Status ---");
-        msg(ctx, "Owner: \u00a7e" + (g.getOwnerName().isEmpty() ? "(none)" : g.getOwnerName()));
-        msg(ctx, "Health: \u00a7e" + String.format("%.1f", g.getHealth()) + "\u00a7f / \u00a7e" + String.format("%.1f", g.getMaxHealth()));
-        msg(ctx, "Patrol: " + (g.isPatrolling() ? "\u00a7aActive" : "\u00a7cStopped") + " \u00a7f| Waypoints: \u00a7e" + g.getWaypoints().size()
-                + " \u00a7f| Speed: \u00a7e" + String.format("%.2f", g.getPatrolSpeed()));
-        msg(ctx, "Threat Mode: \u00a7e" + g.getThreatMode().name());
-        msg(ctx, "Detection Radius: \u00a7e" + String.format("%.1f", g.getEffectiveDetectionRadius()) + " blocks");
-        msg(ctx, "Modules \u2014 Harming:\u00a7e" + (g.hasHarmingModule() ? "yes" : "no")
-                + "\u00a7f Speed:\u00a7e" + (g.hasSpeedModule() ? "yes" : "no")
-                + "\u00a7f Smart:\u00a7e" + (g.hasSmartModule() ? "yes" : "no")
-                + "\u00a7f Storage:\u00a7e" + (g.hasStorageModule() ? "yes" : "no"));
-        msg(ctx, "Allowlist module: \u00a77" + (g.hasAllowlistModule() ? "installed" : "none"));
-        msg(ctx, "Denylist module: \u00a77" + (g.hasDenylistModule() ? "installed" : "none"));
+        msg(ctx, "scguardgolem.cmd.status_header");
+        msg(ctx, "scguardgolem.cmd.status_owner",
+                g.getOwnerName().isEmpty() ? Component.translatable("scguardgolem.cmd.owner_none") : g.getOwnerName());
+        msg(ctx, "scguardgolem.cmd.status_health",
+                String.format("%.1f", g.getHealth()), String.format("%.1f", g.getMaxHealth()));
+        msg(ctx, "scguardgolem.cmd.status_patrol",
+                Component.translatable(g.isPatrolling() ? "scguardgolem.cmd.active" : "scguardgolem.cmd.stopped"),
+                g.getWaypoints().size(), String.format("%.2f", g.getPatrolSpeed()));
+        msg(ctx, "scguardgolem.cmd.status_threat", Component.translatable("scguardgolem.gui.threat." + g.getThreatMode().name()));
+        msg(ctx, "scguardgolem.cmd.status_detection", String.format("%.1f", g.getEffectiveDetectionRadius()));
+        msg(ctx, "scguardgolem.cmd.status_modules",
+                yesNo(g.hasHarmingModule()), yesNo(g.hasSpeedModule()), yesNo(g.hasSmartModule()), yesNo(g.hasStorageModule()));
+        msg(ctx, "scguardgolem.cmd.status_lists",
+                Component.translatable(g.hasAllowlistModule() ? "scguardgolem.gui.lists.installed" : "scguardgolem.gui.lists.none"),
+                Component.translatable(g.hasDenylistModule() ? "scguardgolem.gui.lists.installed" : "scguardgolem.gui.lists.none"));
         return 1;
     }
 
@@ -197,7 +210,7 @@ public class SCGCommands {
         if (g == null) return 0;
         var player = ctx.getSource().getPlayerOrException();
         g.setGolemOwner(player);
-        msg(ctx, "You are now the owner of this Security Golem.");
+        msg(ctx, "scguardgolem.cmd.now_owner");
         return 1;
     }
 }
