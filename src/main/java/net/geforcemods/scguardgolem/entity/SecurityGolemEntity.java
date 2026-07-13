@@ -12,13 +12,18 @@ import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import java.util.UUID;
+
 import net.geforcemods.securitycraft.api.IEMPAffected;
 import net.geforcemods.securitycraft.api.IModuleInventory;
 import net.geforcemods.securitycraft.api.IOwnable;
+import net.geforcemods.securitycraft.api.IPasscodeProtected;
 import net.geforcemods.securitycraft.api.Owner;
 import net.geforcemods.securitycraft.api.SecurityCraftAPI;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
+import net.geforcemods.securitycraft.misc.SaltData;
+import net.geforcemods.securitycraft.network.client.OpenScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
@@ -62,7 +67,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable, IModuleInventory, IEMPAffected {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwnable, IModuleInventory, IEMPAffected, IPasscodeProtected {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
@@ -130,7 +135,13 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     private int savedWaypointIndex = 0;
     private boolean hadTarget = false;
 
-    private String lootPassword = "";
+    // SecurityCraft passcode protection for the loot (api.IPasscodeProtected)
+    private byte[] passcode;
+    private UUID saltKey;
+    private boolean saveSalt = true;
+    private long cooldownEnd = 0;
+    private static final long PASSCODE_COOLDOWN_MS = 5000L;
+
     private int pickupCooldown = 0;
 
     public enum ThreatMode {
@@ -301,6 +312,13 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
                 }
                 return InteractionResult.PASS;
             }
+            // Bare-hand: passcode-gated loot access. Owner crouch-clicks to set the passcode.
+            if (player.getItemInHand(hand).isEmpty()) {
+                if (player.isCrouching() && isOwner(player)) promptSetPasscode(player);
+                else openLoot(player);
+                return InteractionResult.SUCCESS;
+            }
+            // Owner with any other item: open the full config menu.
             if (SCGuardGolem.canConfigure(this, player)) {
                 if (player instanceof ServerPlayer serverPlayer) {
                     SCGuardGolem.openGolemMenu(serverPlayer, this);
@@ -311,6 +329,12 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
             }
         }
         return InteractionResult.PASS;
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        if (!level().isClientSide() && getSaltKey() != null) SaltData.removeSalt(getSaltKey());
+        super.remove(reason);
     }
 
     // -- Owner (SecurityCraft api.IOwnable) --
@@ -455,9 +479,81 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
     }
 
     // -- Loot Password --
-    public String getLootPassword() { return lootPassword; }
-    public void setLootPassword(String pw) { this.lootPassword = pw != null ? pw : ""; }
-    public boolean hasLootPassword() { return !lootPassword.isEmpty(); }
+    // -- Loot passcode (api.IPasscodeProtected) --
+    @Override
+    public byte[] getPasscode() { return passcode == null || passcode.length == 0 ? null : passcode; }
+
+    @Override
+    public void setPasscode(byte[] passcode) { this.passcode = passcode; }
+
+    @Override
+    public UUID getSaltKey() { return saltKey; }
+
+    @Override
+    public void setSaltKey(UUID saltKey) { this.saltKey = saltKey; }
+
+    @Override
+    public void setSaveSalt(boolean saveSalt) { this.saveSalt = saveSalt; }
+
+    @Override
+    public boolean shouldSaveSalt() { return saveSalt; }
+
+    @Override
+    public void startCooldown() {
+        if (!isOnCooldown()) cooldownEnd = System.currentTimeMillis() + PASSCODE_COOLDOWN_MS;
+    }
+
+    @Override
+    public long getCooldownEnd() { return cooldownEnd; }
+
+    @Override
+    public boolean isOnCooldown() { return System.currentTimeMillis() < cooldownEnd; }
+
+    /** Called by SecurityCraft's CheckPasscode packet on a correct code — open the loot. */
+    @Override
+    public void activate(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) SCGuardGolem.openGolemMenu(serverPlayer, this);
+    }
+
+    // The passcode screens are pos-based in the API; an entity keys them on its id instead.
+    @Override
+    public void openPasscodeGUI(Level level, BlockPos pos, Player player) {
+        if (!level.isClientSide() && getPasscode() != null && player instanceof ServerPlayer serverPlayer)
+            sendPasscodeScreen(serverPlayer, OpenScreen.DataType.CHECK_PASSCODE_FOR_ENTITY);
+    }
+
+    @Override
+    public void openSetPasscodeScreen(ServerPlayer player, BlockPos pos) {
+        sendPasscodeScreen(player, OpenScreen.DataType.SET_PASSCODE_FOR_ENTITY);
+    }
+
+    private void sendPasscodeScreen(ServerPlayer player, OpenScreen.DataType type) {
+        OpenScreen pkt = new OpenScreen(type, getId());
+        //? if forge {
+        /*net.geforcemods.securitycraft.SecurityCraft.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), pkt);
+        *///?} elif <1.21.1 {
+        /*net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(player).send(pkt);
+        *///?} else {
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, pkt);
+        //?}
+    }
+
+    /** Owner opens loot directly (or sets a passcode); others must enter the passcode if one is set. */
+    public void openLoot(Player player) {
+        if (getPasscode() == null) {
+            if (isOwner(player)) {
+                if (player instanceof ServerPlayer serverPlayer) SCGuardGolem.openGolemMenu(serverPlayer, this);
+            }
+        } else {
+            openPasscodeGUI(level(), blockPosition(), player);
+        }
+    }
+
+    /** Owner-triggered: open the set-passcode screen for the loot lock. */
+    public void promptSetPasscode(Player player) {
+        if (isOwner(player) && player instanceof ServerPlayer serverPlayer)
+            openSetPasscodeScreen(serverPlayer, blockPosition());
+    }
 
     // -- Item Pickup --
     private void pickupNearbyItems() {
@@ -608,7 +704,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
-        tag.putString("LootPassword", lootPassword);
+        savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
@@ -650,7 +746,9 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         patrolSpeed = tag.getDoubleOr("PatrolSpeed", 1.0);
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
         entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
-        lootPassword = tag.getStringOr("LootPassword", "");
+        loadPasscodeAndSaltKey(tag);
+        String legacyPw = tag.getStringOr("LootPassword", "");
+        if (!legacyPw.isEmpty() && getPasscode() == null) hashAndSetPasscode(legacyPw);
         recalling = tag.getBooleanOr("Recalling", false);
         dwellTicks = tag.getIntOr("DwellTicks", 0);
         savedWaypointIndex = tag.getIntOr("SavedWaypointIndex", 0);
@@ -695,7 +793,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
-        tag.putString("LootPassword", lootPassword);
+        savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
@@ -782,7 +880,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
-        tag.putString("LootPassword", lootPassword);
+        savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
@@ -876,7 +974,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IOwn
         patrolSpeed = tag.contains("PatrolSpeed") ? tag.getDouble("PatrolSpeed") : 1.0;
         currentWaypointIndex = tag.getInt("CurrentWaypointIndex");
         entityData.set(THREAT_MODE, tag.contains("ThreatMode") ? tag.getInt("ThreatMode") : ThreatMode.WARN.ordinal());
-        lootPassword = tag.getString("LootPassword");
+        loadSaltKey(tag);
+        loadPasscode(tag);
+        String legacyPw = tag.getString("LootPassword");
+        if (!legacyPw.isEmpty() && getPasscode() == null) hashAndSetPasscode(legacyPw);
         recalling = tag.getBoolean("Recalling");
         dwellTicks = tag.getInt("DwellTicks");
         savedWaypointIndex = tag.getInt("SavedWaypointIndex");
