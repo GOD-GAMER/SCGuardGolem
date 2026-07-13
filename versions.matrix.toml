@@ -102,6 +102,10 @@ sc_max              = "1.11"
 sc_curse_fileId     = 8336498
 sc_modrinth_versionId = "X9nq0PvS"
 metadata_file       = "META-INF/neoforge.mods.toml"
+fml_loader_range    = "[4,)"             # FML 4 (NeoForge 21.1) still REQUIRES the
+                                         # modLoader/loaderVersion header; without it the whole
+                                         # file is rejected ("not a valid mod file"). The header
+                                         # became optional on 1.21.8+ (those targets omit this).
 
 # ---- 1.21.8 -----------------------------------------------------------------
 # First target on the ValueInput/ValueOutput save API and the 7-field
