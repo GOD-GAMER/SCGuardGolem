@@ -51,6 +51,9 @@ public final class Gfx {
     // with flat fills (colors match the original mc/1.20.1 branch).
     private void fillSprite(Identifier sprite, int x, int y, int w, int h) {
         String p = sprite.getPath();
+        // Custom glyph icons (module icons, etc.) have no 1.20.1 atlas fallback —
+        // skip them so the slot shows plain rather than a flat-colored blob.
+        if (p.startsWith("mod_")) return;
         if (p.contains("slot")) {
             g.fill(x, y, x + w, y + h, 0xFF8B8B8B);
             g.fill(x + 1, y + 1, x + w - 1, y + h - 1, 0xFFD8D8D8);

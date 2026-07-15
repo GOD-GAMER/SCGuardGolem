@@ -36,6 +36,12 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     private static final Identifier TAB_SEL_HIGHLIGHTED_SPRITE = new Identifier("minecraft", "widget/tab_selected_highlighted");
     private static final Identifier SCROLLER_BG_SPRITE = new Identifier("minecraft", "widget/scroller_background");
     private static final Identifier SCROLLER_SPRITE = new Identifier("minecraft", "widget/scroller");
+    private static final Identifier MOD_HARMING_SPRITE = new Identifier("scguardgolem", "mod_harming");
+    private static final Identifier MOD_SPEED_SPRITE = new Identifier("scguardgolem", "mod_speed");
+    private static final Identifier MOD_SMART_SPRITE = new Identifier("scguardgolem", "mod_smart");
+    private static final Identifier MOD_STORAGE_SPRITE = new Identifier("scguardgolem", "mod_storage");
+    private static final Identifier MOD_ALLOWLIST_SPRITE = new Identifier("scguardgolem", "mod_allowlist");
+    private static final Identifier MOD_DENYLIST_SPRITE = new Identifier("scguardgolem", "mod_denylist");
     *///?} else {
     private static final Identifier PANEL_SPRITE = Identifier.parse("scguardgolem:scg_panel");
     private static final Identifier SLOT_SPRITE = Identifier.withDefaultNamespace("container/slot");
@@ -45,7 +51,19 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     private static final Identifier TAB_SEL_HIGHLIGHTED_SPRITE = Identifier.withDefaultNamespace("widget/tab_selected_highlighted");
     private static final Identifier SCROLLER_BG_SPRITE = Identifier.withDefaultNamespace("widget/scroller_background");
     private static final Identifier SCROLLER_SPRITE = Identifier.withDefaultNamespace("widget/scroller");
+    private static final Identifier MOD_HARMING_SPRITE = Identifier.parse("scguardgolem:mod_harming");
+    private static final Identifier MOD_SPEED_SPRITE = Identifier.parse("scguardgolem:mod_speed");
+    private static final Identifier MOD_SMART_SPRITE = Identifier.parse("scguardgolem:mod_smart");
+    private static final Identifier MOD_STORAGE_SPRITE = Identifier.parse("scguardgolem:mod_storage");
+    private static final Identifier MOD_ALLOWLIST_SPRITE = Identifier.parse("scguardgolem:mod_allowlist");
+    private static final Identifier MOD_DENYLIST_SPRITE = Identifier.parse("scguardgolem:mod_denylist");
     //?}
+
+    // Per-slot module icons, in acceptedModules() order (drawn as a ghost hint in each slot).
+    private static final Identifier[] MOD_SPRITES = {
+        MOD_HARMING_SPRITE, MOD_SPEED_SPRITE, MOD_SMART_SPRITE,
+        MOD_STORAGE_SPRITE, MOD_ALLOWLIST_SPRITE, MOD_DENYLIST_SPRITE
+    };
 
     // Text colors (ARGB)
     private static final int C_TITLE = 0xFF404040;
@@ -313,6 +331,7 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             int sy = y + GolemMenu.MOD_Y - 1 + row * GolemMenu.MOD_ROW;
 
             g.sprite(SLOT_SPRITE, sx, sy, 18, 18);
+            g.sprite(MOD_SPRITES[i], sx + 1, sy + 1, 16, 16);
             g.text(font, labels[i], sx + 1, sy + 19, C_DIM, false);
         }
 
