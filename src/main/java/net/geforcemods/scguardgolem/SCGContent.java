@@ -154,7 +154,8 @@ public class SCGContent {
 
     // EMP gun (base + redstone-charged "powered") — a real in-world trigger for
     // the IEMPAffected shutdown path; SecurityCraft ships no EMP itself. Behavior
-    // is modeled on SecurityCraft's taser (MIT); textures are original — see CREDITS.md.
+    // is modeled on SecurityCraft's taser (MIT); the item model parents the taser's
+    // 3D model with recolored textures — see CREDITS.md.
     //? if forge {
     /*public static final RegistryObject<EmpGunItem> EMP_GUN =
             ITEMS.register("emp_gun", () ->

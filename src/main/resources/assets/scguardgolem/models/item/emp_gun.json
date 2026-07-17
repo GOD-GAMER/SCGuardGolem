@@ -1,6 +1,7 @@
 {
-  "parent": "minecraft:item/generated",
+  "parent": "securitycraft:item/taser",
   "textures": {
-    "layer0": "scguardgolem:item/emp_gun"
+    "taser": "scguardgolem:item/emp_gun",
+    "particle": "scguardgolem:item/emp_gun"
   }
 }
