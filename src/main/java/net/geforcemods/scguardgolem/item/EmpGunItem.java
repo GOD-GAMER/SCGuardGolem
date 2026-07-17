@@ -99,19 +99,17 @@ public class EmpGunItem extends Item {
         AABB box = player.getBoundingBox().expandTowards(look).inflate(1, 1, 1);
         EntityHitResult hit = ProjectileUtil.getEntityHitResult(player, start, end, box, LivingEntity.class::isInstance, RANGE * RANGE);
 
-        // Muzzle flash + a spark beam traced from the barrel to the impact point.
+        // Muzzle flash + a dense energy beam traced from the barrel to the impact point.
         if (level instanceof ServerLevel sl) {
-            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, start.x, start.y, start.z, 6, 0.05, 0.02);
-            SCGFx.burst(sl, ParticleTypes.SMOKE, start.x, start.y, start.z, 2, 0.05, 0.01);
             Vec3 tip = hit != null ? hit.getLocation() : end;
-            int steps = Math.max(1, Math.min((int) start.distanceTo(tip), RANGE));
-            for (int s = 1; s < steps; s++) {
-                double t = (double) s / steps;
-                sl.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-                        start.x + (tip.x - start.x) * t, start.y + (tip.y - start.y) * t, start.z + (tip.z - start.z) * t,
-                        1, 0, 0, 0, 0);
-            }
-            SCGFx.sound(level, player.getX(), player.getY(), player.getZ(), SoundEvents.BLAZE_SHOOT, SoundSource.PLAYERS, 0.7F, 1.6F);
+            int steps = Math.max(4, Math.min((int) (start.distanceTo(tip) * 3), RANGE * 3));
+            SCGFx.beam(sl, ParticleTypes.ELECTRIC_SPARK, start.x, start.y, start.z, tip.x, tip.y, tip.z, steps);
+            SCGFx.beam(sl, powered ? ParticleTypes.SOUL_FIRE_FLAME : ParticleTypes.END_ROD,
+                    start.x, start.y, start.z, tip.x, tip.y, tip.z, steps / 2);
+            SCGFx.burst(sl, ParticleTypes.SOUL_FIRE_FLAME, start.x, start.y, start.z, 4, 0.05, 0.02);
+            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, start.x, start.y, start.z, 6, 0.06, 0.02);
+            if (hit == null) SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, tip.x, tip.y, tip.z, 8, 0.1, 0.06);
+            SCGFx.sound(level, player.getX(), player.getY(), player.getZ(), SoundEvents.BLAZE_SHOOT, SoundSource.PLAYERS, 0.8F, powered ? 1.4F : 1.7F);
         }
 
         if (hit != null) {

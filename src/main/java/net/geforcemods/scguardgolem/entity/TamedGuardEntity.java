@@ -152,8 +152,13 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
             scanTimer = (scanTimer + 1) % 20;
             if (pickupCooldown > 0) pickupCooldown--;
             else { core.pickupNearbyItems(getBoundingBox().inflate(2.0)); pickupCooldown = 10; }
-            if (isShutDown() && scanTimer == 0 && level() instanceof ServerLevel sl)
-                SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
+            if (level() instanceof ServerLevel sl) {
+                if (empBlastFxTimer > 0) { SCGFx.tickEmpBlast(sl, this, empBlastFxTimer); empBlastFxTimer--; }
+                if (powerUpFxTimer > 0)  { SCGFx.tickPowerUp(sl, this, powerUpFxTimer);   powerUpFxTimer--; }
+                if (alertFxTimer > 0)    { SCGFx.tickAlert(sl, this, alertFxTimer);       alertFxTimer--; }
+                if (isShutDown() && scanTimer == 0)
+                    SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
+            }
         }
     }
 
@@ -229,25 +234,24 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
     public void openSetPasscodeScreen(ServerPlayer player, BlockPos pos) { core.openSetScreen(player); }
 
     // -- IEMPAffected --
+    // Transient FX countdowns (not saved/synced) — drive the animated set-pieces in tick().
+    private int empBlastFxTimer, powerUpFxTimer, alertFxTimer;
+
+    public void startEmpBlastFx() { empBlastFxTimer = SCGFx.EMP_BLAST_TICKS; }
+    public void startPowerUpFx()  { powerUpFxTimer  = SCGFx.POWER_UP_TICKS; }
+    public void startAlertFx()    { alertFxTimer    = SCGFx.ALERT_TICKS; }
+
     @Override
     public void shutDown() {
         setShutDown(true);
         setTarget(null);
-        if (level() instanceof ServerLevel sl) {
-            SCGFx.burst(sl, ParticleTypes.LARGE_SMOKE, this, 8, 0.4, 0.02);
-            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, this, 14, 0.4, 0.1);
-            SCGFx.sound(level(), this, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 0.9F, 0.7F);
-        }
+        startEmpBlastFx();
     }
 
     @Override
     public void reactivate() {
         setShutDown(false);
-        if (level() instanceof ServerLevel sl) {
-            SCGFx.burst(sl, ParticleTypes.HAPPY_VILLAGER, this, 10, 0.4, 0.0);
-            SCGFx.burst(sl, ParticleTypes.END_ROD, this, 6, 0.3, 0.02);
-            SCGFx.sound(level(), this, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 0.8F, 1.2F);
-        }
+        startPowerUpFx();
     }
 
     @Override
@@ -265,8 +269,8 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
         if (isShutDown()) { super.setTarget(null); return; }
         boolean hadNoTarget = getTarget() == null;
         super.setTarget(target);
-        if (hadNoTarget && target != null && level() instanceof ServerLevel sl) {
-            SCGFx.burst(sl, ParticleTypes.ANGRY_VILLAGER, getX(), getY() + getBbHeight() + 0.3, getZ(), 4, 0.2, 0.0);
+        if (hadNoTarget && target != null && level() instanceof ServerLevel) {
+            startAlertFx();
             SCGFx.sound(level(), this, SoundEvents.ZOMBIE_AMBIENT, SoundSource.HOSTILE, 0.9F, 0.7F);
         }
     }

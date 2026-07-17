@@ -221,8 +221,8 @@ public class SCGuardGolem {
 
         ironGolem.discard();
         serverLevel.addFreshEntity(golem);
-        SCGFx.burst(serverLevel, ParticleTypes.HAPPY_VILLAGER, golem, 15, 0.5, 0.0);
-        SCGFx.burst(serverLevel, ParticleTypes.END_ROD, golem, 10, 0.4, 0.02);
+        golem.startPowerUpFx(); // epic power-on: rising energy helix + totem burst
+        SCGFx.burst(serverLevel, ParticleTypes.FIREWORK, golem, 20, 0.4, 0.1);
         SCGFx.sound(serverLevel, golem, SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 0.8F, 1.3F);
 
         held.shrink(1);
@@ -257,8 +257,8 @@ public class SCGuardGolem {
 
         monster.discard();
         level.addFreshEntity(guard);
-        SCGFx.burst(level, ParticleTypes.HEART, guard, 8, 0.4, 0.0);
-        SCGFx.burst(level, ParticleTypes.HAPPY_VILLAGER, guard, 10, 0.4, 0.0);
+        guard.startPowerUpFx(); // epic power-on helix
+        SCGFx.burst(level, ParticleTypes.HEART, guard, 10, 0.4, 0.0);
         SCGFx.sound(level, guard, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.7F, 1.4F);
         held.shrink(1);
         msg(player, Component.translatable("scguardgolem.tamed.success"));

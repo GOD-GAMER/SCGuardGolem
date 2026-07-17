@@ -221,25 +221,24 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
 
     // -- IEMPAffected: shut down by any EMP (the addon's EMP Gun, or another
     //    mod's) exactly like SecurityCraft's own devices; reactivate with redstone. --
+    // Transient FX countdowns (not saved/synced) — drive the animated set-pieces in tick().
+    private int empBlastFxTimer, powerUpFxTimer, alertFxTimer;
+
+    public void startEmpBlastFx() { empBlastFxTimer = SCGFx.EMP_BLAST_TICKS; }
+    public void startPowerUpFx()  { powerUpFxTimer  = SCGFx.POWER_UP_TICKS; }
+    public void startAlertFx()    { alertFxTimer    = SCGFx.ALERT_TICKS; }
+
     @Override
     public void shutDown() {
         setShutDown(true); // IEMPAffected default body (can't use I.super via the aggregate interface)
         setTarget(null);
-        if (level() instanceof ServerLevel sl) {
-            SCGFx.burst(sl, ParticleTypes.LARGE_SMOKE, this, 8, 0.4, 0.02);
-            SCGFx.burst(sl, ParticleTypes.ELECTRIC_SPARK, this, 14, 0.4, 0.1);
-            SCGFx.sound(level(), this, SoundEvents.BEACON_DEACTIVATE, SoundSource.HOSTILE, 0.9F, 0.7F);
-        }
+        startEmpBlastFx(); // animated EMP detonation runs from tick()
     }
 
     @Override
     public void reactivate() {
         setShutDown(false);
-        if (level() instanceof ServerLevel sl) {
-            SCGFx.burst(sl, ParticleTypes.HAPPY_VILLAGER, this, 10, 0.4, 0.0);
-            SCGFx.burst(sl, ParticleTypes.END_ROD, this, 6, 0.3, 0.02);
-            SCGFx.sound(level(), this, SoundEvents.BEACON_ACTIVATE, SoundSource.HOSTILE, 0.8F, 1.2F);
-        }
+        startPowerUpFx(); // rising power-up helix runs from tick()
     }
 
     @Override
@@ -256,9 +255,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
             if (scanTimer >= SCAN_INTERVAL_TICKS) scanTimer = 0;
             if (pickupCooldown > 0) pickupCooldown--;
             else pickupNearbyItems();
-            // Disabled golems fizzle a little smoke every scan tick until reactivated.
-            if (isShutDown() && scanTimer == 0 && level() instanceof ServerLevel sl)
-                SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
+            if (level() instanceof ServerLevel sl) {
+                if (empBlastFxTimer > 0) { SCGFx.tickEmpBlast(sl, this, empBlastFxTimer); empBlastFxTimer--; }
+                if (powerUpFxTimer > 0)  { SCGFx.tickPowerUp(sl, this, powerUpFxTimer);   powerUpFxTimer--; }
+                if (alertFxTimer > 0)    { SCGFx.tickAlert(sl, this, alertFxTimer);       alertFxTimer--; }
+                // Disabled golems fizzle a little smoke every scan tick until reactivated.
+                if (isShutDown() && scanTimer == 0)
+                    SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
+            }
         }
     }
 
@@ -275,11 +279,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
                 // Save current waypoint when combat starts
                 savedWaypointIndex = currentWaypointIndex;
                 hadTarget = true;
-                // Alert: one angry puff + a grunt when a threat is first acquired.
-                if (level() instanceof ServerLevel sl) {
-                    SCGFx.burst(sl, ParticleTypes.ANGRY_VILLAGER, getX(), getY() + getBbHeight() + 0.3, getZ(), 4, 0.2, 0.0);
+                // Alert: an animated warning pulse + a grunt when a threat is first acquired.
+                startAlertFx();
+                if (level() instanceof ServerLevel)
                     SCGFx.sound(level(), this, SoundEvents.IRON_GOLEM_ATTACK, SoundSource.HOSTILE, 0.8F, 0.9F);
-                }
             } else if (target == null && hadTarget) {
                 // Combat ended — restore waypoint
                 currentWaypointIndex = savedWaypointIndex;
