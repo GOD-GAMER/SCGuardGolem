@@ -35,6 +35,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Client-side asset integrity. The compile and server-boot rungs below are
+      # blind to these: a missing lang key renders as raw text in a GUI and a bad
+      # model/texture ref shows as a missing model — neither fails a build or a
+      # dedicated-server boot. Caught two real bugs the first time it ran.
+      - name: "Rung 0: asset verify"
+        run: node tools/verify-assets.js
+
       # The repo once shipped a corrupted gradlew that silently dropped all
       # arguments. Never again.
       - uses: gradle/actions/wrapper-validation@v4

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.1
+- **Fixed raw text in the Lists tab.** `scguardgolem.gui.lists.allow` / `.deny` were
+  referenced by the config screen but never defined, so the Lists tab rendered the raw
+  translation keys instead of "Allowlist: installed" / "Denylist: none".
+- **New: `tools/verify-assets.js`, wired into CI as Rung 0.** Validates every lang key
+  referenced in code, every model parent and texture reference, and every GUI sprite.
+  These are client-side failures that a compile and a dedicated-server boot are blind
+  to — which is why the above shipped in 2.0.0. Proven to fail against injected
+  regressions, so it cannot pass vacuously.
+
 ## 2.0.0
 
 ### Patrol fixes (this is the one that matters if your golem got stuck)
