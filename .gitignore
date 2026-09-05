@@ -25,3 +25,9 @@ desktop.ini
 out/
 knowledge_book.png
 
+
+# Stonecutter / Kotlin
+.kotlin/
+versions/*/build/
+versions/*/run/
+versions/*/.gradle/

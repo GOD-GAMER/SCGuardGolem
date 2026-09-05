@@ -5,25 +5,39 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
 
 import net.geforcemods.scguardgolem.SCGContent;
+import net.geforcemods.scguardgolem.SCGFx;
 import net.geforcemods.scguardgolem.SCGuardGolem;
 import net.geforcemods.scguardgolem.entity.goal.BadgeCheckGoal;
 import net.geforcemods.scguardgolem.entity.goal.PatrolGoal;
 import net.geforcemods.scguardgolem.entity.goal.PlayerThreatGoal;
 import net.geforcemods.scguardgolem.inventory.GolemMenu;
+import java.util.UUID;
+
+import net.geforcemods.securitycraft.api.IEMPAffected;
+import net.geforcemods.securitycraft.api.IModuleInventory;
+import net.geforcemods.securitycraft.api.IOwnable;
+import net.geforcemods.securitycraft.api.IPasscodeProtected;
+import net.geforcemods.securitycraft.api.Owner;
+import net.geforcemods.securitycraft.api.SecurityCraftAPI;
 import net.geforcemods.securitycraft.items.ModuleItem;
 import net.geforcemods.securitycraft.misc.ModuleType;
+import net.geforcemods.securitycraft.misc.SaltData;
+import net.geforcemods.securitycraft.network.client.OpenScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.Container;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
@@ -37,7 +51,10 @@ import net.minecraft.world.entity.ai.goal.MoveTowardsTargetGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.entity.ai.goal.target.HurtByTargetGoal;
 import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
+//? if >=1.21.11 {
 import net.minecraft.world.entity.animal.golem.IronGolem;
+//?} else
+/*import net.minecraft.world.entity.animal.IronGolem;*/
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Enemy;
@@ -45,40 +62,45 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+//? if >=1.21.8 {
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+//?}
+//? if >=1.21.1
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.phys.AABB;
 
-public class SecurityGolemEntity extends IronGolem implements MenuProvider {
+public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGuardEntity {
 
     private static final EntityDataAccessor<Boolean> PATROLLING =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
-    private static final EntityDataAccessor<String> OWNER_UUID =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
-    private static final EntityDataAccessor<String> OWNER_NAME =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Boolean> SHUT_DOWN =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.BOOLEAN);
+    // SecurityCraft Owner, synced to the client via its own EntityDataSerializer
+    // (present on every SC version). Replaces the old owner-UUID/name string pair.
+    private static final EntityDataAccessor<Owner> OWNER =
+            SynchedEntityData.defineId(SecurityGolemEntity.class, Owner.getSerializer());
     private static final EntityDataAccessor<Integer> THREAT_MODE =
             SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<String> IGNORE_LIST_DATA =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
-    private static final EntityDataAccessor<String> ATTACK_LIST_DATA =
-            SynchedEntityData.defineId(SecurityGolemEntity.class, EntityDataSerializers.STRING);
-    // Module slots
-    public static final int MODULE_SLOTS = 4;
-    public static final int SLOT_HARMING = 0;
-    public static final int SLOT_SPEED = 1;
-    public static final int SLOT_SMART = 2;
-    public static final int SLOT_STORAGE = 3;
+    // SecurityCraft module inventory (api.IModuleInventory). Modules are BINARY —
+    // present = full effect; SC modules don't stack.
+    public static final ModuleType[] ACCEPTED_MODULES = {
+        ModuleType.HARMING, ModuleType.SPEED, ModuleType.SMART, ModuleType.STORAGE,
+        ModuleType.ALLOWLIST, ModuleType.DENYLIST
+    };
 
-    public static final int MAX_UPGRADE_LEVEL = 5;
+    public static final int MODULE_SLOTS = ACCEPTED_MODULES.length;
+
     public static final int MAX_LOOT_ROWS = 6;
     public static final int BASE_LOOT_SLOTS = 9;
     public static final double BASE_DETECTION_RADIUS = 16.0;
-    public static final double DETECTION_RADIUS_PER_LEVEL = 4.0;
-    public static final double DAMAGE_PER_LEVEL = 3.0;
-    public static final double SPEED_PER_LEVEL = 0.03;
+    public static final double SMART_DETECTION_RADIUS = 32.0;
+    public static final double BASE_ATTACK_DAMAGE = 15.0;
+    public static final double HARMING_ATTACK_DAMAGE = 25.0;
+    public static final double BASE_SPEED = 0.25;
+    public static final double FAST_SPEED = 0.35;
 
     private final SimpleContainer moduleInventory = new SimpleContainer(MODULE_SLOTS) {
         @Override
@@ -86,10 +108,17 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             super.setChanged();
             onModulesChanged();
         }
+        //? if >=1.21.1 {
         @Override
         public int getMaxStackSize(ItemStack stack) {
-            return MAX_UPGRADE_LEVEL;
+            return 1;
         }
+        //?} else {
+        /*@Override
+        public int getMaxStackSize() {
+            return 1;
+        }
+        *///?}
     };
     private SimpleContainer lootInventory = new SimpleContainer(BASE_LOOT_SLOTS);
 
@@ -99,14 +128,12 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     private int currentWaypointIndex = 0;
     private double patrolSpeed = 1.0;
     private int dwellTicks = 0;
+    /** Blocks the golem may roam around its current waypoint while dwelling; 0 = stand still. */
+    private int wanderRadius = 0;
 
     // Loot item filter (item registry names)
     private final LinkedHashSet<String> lootFilter = new LinkedHashSet<>();
 
-    // Name-based allow/deny lists
-    public static final int MAX_LIST_ENTRIES = 8;
-    private final TreeSet<String> ignoreList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-    private final TreeSet<String> attackList = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
     // Bell recall state
     private boolean recalling = false;
@@ -115,7 +142,13 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     private int savedWaypointIndex = 0;
     private boolean hadTarget = false;
 
-    private String lootPassword = "";
+    // SecurityCraft passcode protection for the loot (api.IPasscodeProtected)
+    private byte[] passcode;
+    private UUID saltKey;
+    private boolean saveSalt = true;
+    private long cooldownEnd = 0;
+    private static final long PASSCODE_COOLDOWN_MS = 5000L;
+
     private int pickupCooldown = 0;
 
     public enum ThreatMode {
@@ -133,16 +166,25 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         super(type, level);
     }
 
+    //? if >=1.21.1 {
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(PATROLLING, false);
-        builder.define(OWNER_UUID, "");
-        builder.define(OWNER_NAME, "");
+        builder.define(SHUT_DOWN, false);
+        builder.define(OWNER, new Owner());
         builder.define(THREAT_MODE, ThreatMode.WARN.ordinal());
-        builder.define(IGNORE_LIST_DATA, "");
-        builder.define(ATTACK_LIST_DATA, "");
     }
+    //?} else {
+    /*@Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        entityData.define(PATROLLING, false);
+        entityData.define(SHUT_DOWN, false);
+        entityData.define(OWNER, new Owner());
+        entityData.define(THREAT_MODE, ThreatMode.WARN.ordinal());
+    }
+    *///?}
 
     @Override
     protected void registerGoals() {
@@ -155,10 +197,57 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
         this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
         this.targetSelector.addGoal(2, new PlayerThreatGoal(this));
+        //? if >=1.21.8 {
         this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
                 net.minecraft.world.entity.Mob.class, 5, false, false,
-                (entity, level) -> entity instanceof Enemy && !(entity instanceof Creeper)));
+                (entity, level) -> isHostileThreat(entity)));
+        //?} else {
+        /*this.targetSelector.addGoal(3, new NearestAttackableTargetGoal<>(this,
+                net.minecraft.world.entity.Mob.class, 5, false, false,
+                entity -> isHostileThreat(entity)));
+        *///?}
     }
+
+    /**
+     * A hostile threat is any Enemy (bar Creepers) OR anything another mod registered
+     * as sentry-attackable via SecurityCraft IMC — so the golem's threat logic stays
+     * consistent with the Sentry and respects other addons' rules.
+     */
+    public boolean isHostileThreat(net.minecraft.world.entity.Entity entity) {
+        if (isShutDown()) return false;
+        if (entity instanceof Creeper) return false;
+        if (entity instanceof Enemy) return true;
+        return SecurityCraftAPI.getRegisteredSentryAttackTargetChecks().stream()
+                .anyMatch(check -> check.canAttack(entity));
+    }
+
+    // -- IEMPAffected: shut down by any EMP (the addon's EMP Gun, or another
+    //    mod's) exactly like SecurityCraft's own devices; reactivate with redstone. --
+    // Transient FX countdowns (not saved/synced) — drive the animated set-pieces in tick().
+    private int empBlastFxTimer, powerUpFxTimer, alertFxTimer;
+
+    public void startEmpBlastFx() { empBlastFxTimer = SCGFx.EMP_BLAST_TICKS; }
+    public void startPowerUpFx()  { powerUpFxTimer  = SCGFx.POWER_UP_TICKS; }
+    public void startAlertFx()    { alertFxTimer    = SCGFx.ALERT_TICKS; }
+
+    @Override
+    public void shutDown() {
+        setShutDown(true); // IEMPAffected default body (can't use I.super via the aggregate interface)
+        setTarget(null);
+        startEmpBlastFx(); // animated EMP detonation runs from tick()
+    }
+
+    @Override
+    public void reactivate() {
+        setShutDown(false);
+        startPowerUpFx(); // rising power-up helix runs from tick()
+    }
+
+    @Override
+    public boolean isShutDown() { return entityData.get(SHUT_DOWN); }
+
+    @Override
+    public void setShutDown(boolean shutDown) { entityData.set(SHUT_DOWN, shutDown); }
 
     @Override
     public void tick() {
@@ -168,6 +257,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             if (scanTimer >= SCAN_INTERVAL_TICKS) scanTimer = 0;
             if (pickupCooldown > 0) pickupCooldown--;
             else pickupNearbyItems();
+            if (level() instanceof ServerLevel sl) {
+                if (empBlastFxTimer > 0) { SCGFx.tickEmpBlast(sl, this, empBlastFxTimer); empBlastFxTimer--; }
+                if (powerUpFxTimer > 0)  { SCGFx.tickPowerUp(sl, this, powerUpFxTimer);   powerUpFxTimer--; }
+                if (alertFxTimer > 0)    { SCGFx.tickAlert(sl, this, alertFxTimer);       alertFxTimer--; }
+                // Disabled golems fizzle a little smoke every scan tick until reactivated.
+                if (isShutDown() && scanTimer == 0)
+                    SCGFx.burst(sl, ParticleTypes.SMOKE, getX(), getY() + getBbHeight(), getZ(), 2, 0.15, 0.01);
+            }
         }
     }
 
@@ -176,6 +273,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     /** Track target acquisition so PatrolGoal can resume at saved waypoint after combat. */
     @Override
     public void setTarget(net.minecraft.world.entity.LivingEntity target) {
+        if (isShutDown()) { super.setTarget(null); return; } // EMP'd golems don't fight
         boolean hadNoTarget = this.getTarget() == null;
         super.setTarget(target);
         if (!level().isClientSide()) {
@@ -183,6 +281,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
                 // Save current waypoint when combat starts
                 savedWaypointIndex = currentWaypointIndex;
                 hadTarget = true;
+                // Alert: an animated warning pulse + a grunt when a threat is first acquired.
+                startAlertFx();
+                if (level() instanceof ServerLevel)
+                    SCGFx.sound(level(), this, SoundEvents.IRON_GOLEM_ATTACK, SoundSource.HOSTILE, 0.8F, 0.9F);
             } else if (target == null && hadTarget) {
                 // Combat ended — restore waypoint
                 currentWaypointIndex = savedWaypointIndex;
@@ -192,18 +294,20 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     }
 
     // -- MenuProvider --
-    @Override
-    public Component getDisplayName() {
-        return Component.translatable("scguardgolem.gui.title");
-    }
+    // NOTE: deliberately NO getDisplayName() override. MenuProvider.getDisplayName()
+    // and Entity.getDisplayName() are the same method, so overriding it to return the
+    // GUI title renamed the MOB itself ("Summoned new Security Golem Configuration",
+    // death messages, name tags). Entity's own implementation satisfies MenuProvider
+    // and keeps the real entity name + custom name-tag support; GolemScreen never
+    // shows the menu title anyway (it sets titleLabelY = 999 and draws per-tab titles).
 
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player player) {
         return new GolemMenu(containerId, playerInv, this);
     }
 
-    @Override
-    public void writeClientSideData(AbstractContainerMenu menu, net.minecraft.network.RegistryFriendlyByteBuf buf) {
+    /** Extra menu data; used by writeClientSideData (NeoForge) / NetworkHooks (Forge 1.20.1). */
+    public void writeMenuData(FriendlyByteBuf buf) {
         buf.writeInt(this.getId());
         buf.writeInt(getLootRows());
         // Waypoints
@@ -218,56 +322,126 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         buf.writeInt(currentWaypointIndex);
     }
 
+    //? if forge {
+    /*// Forge 1.20.1: extra data goes through NetworkHooks.openScreen(…, this::writeMenuData)
+    *///?} elif <1.21.1 {
+    /*@Override
+    public void writeClientSideData(AbstractContainerMenu menu, FriendlyByteBuf buf) {
+        writeMenuData(buf);
+    }
+    *///?} else {
+    @Override
+    public void writeClientSideData(AbstractContainerMenu menu, RegistryFriendlyByteBuf buf) {
+        writeMenuData(buf);
+    }
+    //?}
+
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (!level().isClientSide() && hand == InteractionHand.MAIN_HAND) {
-            if (isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            // Reactivate an EMP-disabled golem with redstone (the Sentry pattern).
+            if (isShutDown() && player.getItemInHand(hand).getItem() == net.minecraft.world.item.Items.REDSTONE) {
+                if (SCGuardGolem.canConfigure(this, player)) {
+                    reactivate();
+                    if (!player.isCreative()) player.getItemInHand(hand).shrink(1);
+                    return InteractionResult.SUCCESS;
+                }
+                return InteractionResult.PASS;
+            }
+            // Bare-hand: passcode-gated loot access. Owner crouch-clicks to set the passcode.
+            if (player.getItemInHand(hand).isEmpty()) {
+                if (player.isCrouching() && isOwner(player)) promptSetPasscode(player);
+                else openLoot(player);
+                return InteractionResult.SUCCESS;
+            }
+            // Owner with any other item: open the full config menu.
+            if (SCGuardGolem.canConfigure(this, player)) {
                 if (player instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.openMenu(this);
+                    SCGuardGolem.openGolemMenu(serverPlayer, this);
                 }
                 return InteractionResult.SUCCESS;
             } else {
-                player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
+                SCGuardGolem.msg(player, Component.translatable("scguardgolem.not_owner").withStyle(net.minecraft.ChatFormatting.RED));
             }
         }
         return InteractionResult.PASS;
     }
 
-    // -- Owner --
-    public void setGolemOwner(Player player) {
-        entityData.set(OWNER_UUID, player.getGameProfile().id().toString());
-        entityData.set(OWNER_NAME, player.getName().getString());
-    }
-    public String getOwnerUUID() { return entityData.get(OWNER_UUID); }
-    public String getOwnerName() { return entityData.get(OWNER_NAME); }
-    public boolean isOwner(Player player) {
-        String uuid = getOwnerUUID();
-        return !uuid.isEmpty() && uuid.equals(player.getGameProfile().id().toString());
+    @Override
+    public void remove(RemovalReason reason) {
+        if (!level().isClientSide() && getSaltKey() != null) SaltData.removeSalt(getSaltKey());
+        super.remove(reason);
     }
 
-    // -- Module Inventory --
+    // -- Owner (SecurityCraft api.IOwnable) --
+    public void setGolemOwner(Player player) {
+        entityData.set(OWNER, new Owner(player));
+    }
+
+    @Override
+    public Owner getOwner() {
+        return entityData.get(OWNER);
+    }
+
+    @Override
+    public void setOwner(String uuid, String name) {
+        entityData.set(OWNER, new Owner(name, uuid));
+    }
+
+    // The IOwnable default casts `this` to BlockEntity; this is an entity, so no-op (Sentry does the same).
+    @Override
+    public void onOwnerChanged(BlockState state, Level level, BlockPos pos, Player player, Owner oldOwner, Owner newOwner) {}
+
+    public String getOwnerUUID() { return getOwner().getUUID(); }
+    public String getOwnerName() { return getOwner().getName(); }
+
+    /** Owner check that also honours SecurityCraft teams (via IOwnable#isOwnedBy). */
+    public boolean isOwner(Player player) {
+        return isOwnedBy(player, false);
+    }
+
+    // -- Module Inventory (api.IModuleInventory) --
+    /** The backing SimpleContainer (GUI slots + save/load use this; getInventory() is a view of it). */
     public SimpleContainer getModuleInventory() { return moduleInventory; }
 
-    public int getModuleCount(int slot) {
-        ItemStack stack = moduleInventory.getItem(slot);
-        return stack.isEmpty() ? 0 : Math.min(stack.getCount(), MAX_UPGRADE_LEVEL);
+    @Override
+    public NonNullList<ItemStack> getInventory() {
+        // Read-only view for SecurityCraft. Nothing writes through getInventory():
+        // the GUI edits the SimpleContainer via slots; getModule/isAllowed only read.
+        NonNullList<ItemStack> view = NonNullList.withSize(moduleInventory.getContainerSize(), ItemStack.EMPTY);
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++)
+            view.set(i, moduleInventory.getItem(i));
+        return view;
     }
 
-    public static ModuleType getExpectedModuleType(int slot) {
-        return switch (slot) {
-            case SLOT_HARMING -> ModuleType.HARMING;
-            case SLOT_SPEED -> ModuleType.SPEED;
-            case SLOT_SMART -> ModuleType.SMART;
-            case SLOT_STORAGE -> ModuleType.STORAGE;
-            default -> null;
-        };
-    }
+    @Override
+    public ModuleType[] acceptedModules() { return ACCEPTED_MODULES; }
 
+    @Override
+    public boolean isModuleEnabled(ModuleType module) { return !getModule(module).isEmpty(); }
+
+    @Override
+    public void toggleModuleState(ModuleType module, boolean shouldBeEnabled) {}
+
+    @Override
+    public Level myLevel() { return level(); }
+
+    @Override
+    public BlockPos myPos() { return blockPosition(); }
+
+    // IModuleInventory's insert/remove defaults dirty a BlockEntity (no-op on an entity),
+    // so reapply effects here instead.
+    @Override
+    public void onModuleInserted(ItemStack stack, ModuleType module, boolean toggled) { onModulesChanged(); }
+
+    @Override
+    public void onModuleRemoved(ItemStack stack, ModuleType module, boolean toggled) { onModulesChanged(); }
+
+    /** A config slot accepts a ModuleItem whose type matches acceptedModules()[index]. */
     public static boolean isValidModuleForSlot(int slot, ItemStack stack) {
         if (stack.isEmpty()) return true;
         if (!(stack.getItem() instanceof ModuleItem moduleItem)) return false;
-        ModuleType expected = getExpectedModuleType(slot);
-        return expected != null && moduleItem.getModuleType() == expected;
+        return slot >= 0 && slot < ACCEPTED_MODULES.length && moduleItem.getModuleType() == ACCEPTED_MODULES[slot];
     }
 
     private void onModulesChanged() {
@@ -279,74 +453,33 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         }
     }
 
-    // -- Module-driven upgrades --
-    public int getDamageUpgrade() { return getModuleCount(SLOT_HARMING); }
-    public int getSpeedUpgrade() { return getModuleCount(SLOT_SPEED); }
-    public int getDetectionUpgrade() { return getModuleCount(SLOT_SMART); }
-    public double getEffectiveDetectionRadius() { return BASE_DETECTION_RADIUS + getDetectionUpgrade() * DETECTION_RADIUS_PER_LEVEL; }
+    // -- Module-driven effects (binary: present = full effect) --
+    public boolean hasHarmingModule() { return isModuleEnabled(ModuleType.HARMING); }
+    public boolean hasSpeedModule()   { return isModuleEnabled(ModuleType.SPEED); }
+    public boolean hasSmartModule()   { return isModuleEnabled(ModuleType.SMART); }
+    public boolean hasStorageModule() { return isModuleEnabled(ModuleType.STORAGE); }
+    public double getEffectiveDetectionRadius() { return hasSmartModule() ? SMART_DETECTION_RADIUS : BASE_DETECTION_RADIUS; }
 
     private void applyUpgrades() {
         AttributeInstance a = getAttribute(Attributes.ATTACK_DAMAGE);
-        if (a != null) a.setBaseValue(15.0D + getDamageUpgrade() * DAMAGE_PER_LEVEL);
+        if (a != null) a.setBaseValue(hasHarmingModule() ? HARMING_ATTACK_DAMAGE : BASE_ATTACK_DAMAGE);
         AttributeInstance s = getAttribute(Attributes.MOVEMENT_SPEED);
-        if (s != null) s.setBaseValue(0.25D + getSpeedUpgrade() * SPEED_PER_LEVEL);
+        if (s != null) s.setBaseValue(hasSpeedModule() ? FAST_SPEED : BASE_SPEED);
     }
 
-    // -- Name-based allow/deny lists --
-    public boolean isOnIgnoreList(String name) { return ignoreList.contains(name); }
-    public boolean isOnAlwaysAttackList(String name) { return attackList.contains(name); }
-    public Set<String> getIgnoreListNames() {
-        if (level() != null && level().isClientSide()) {
-            String data = entityData.get(IGNORE_LIST_DATA);
-            if (data.isEmpty()) return Set.of();
-            TreeSet<String> set = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (String s : data.split("\0")) if (!s.isEmpty()) set.add(s);
-            return set;
-        }
-        return Collections.unmodifiableSet(ignoreList);
-    }
-    public Set<String> getAlwaysAttackListNames() {
-        if (level() != null && level().isClientSide()) {
-            String data = entityData.get(ATTACK_LIST_DATA);
-            if (data.isEmpty()) return Set.of();
-            TreeSet<String> set = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-            for (String s : data.split("\0")) if (!s.isEmpty()) set.add(s);
-            return set;
-        }
-        return Collections.unmodifiableSet(attackList);
-    }
-
-    private void syncLists() {
-        entityData.set(IGNORE_LIST_DATA, String.join("\0", ignoreList));
-        entityData.set(ATTACK_LIST_DATA, String.join("\0", attackList));
-    }
-
-    public boolean addToIgnoreList(String name) {
-        if (name == null || name.isBlank() || ignoreList.size() >= MAX_LIST_ENTRIES) return false;
-        attackList.remove(name);
-        boolean added = ignoreList.add(name);
-        syncLists();
-        return added;
-    }
-    public boolean removeFromIgnoreList(String name) { boolean r = ignoreList.remove(name); syncLists(); return r; }
-
-    public boolean addToAttackList(String name) {
-        if (name == null || name.isBlank() || attackList.size() >= MAX_LIST_ENTRIES) return false;
-        ignoreList.remove(name);
-        boolean added = attackList.add(name);
-        syncLists();
-        return added;
-    }
-    public boolean removeFromAttackList(String name) { boolean r = attackList.remove(name); syncLists(); return r; }
+    // -- Allow/deny via SecurityCraft ALLOWLIST/DENYLIST modules (api.IModuleInventory) --
+    // isAllowed(Entity) / isDenied(Entity) are inherited defaults, backed by the list
+    // module data (ListModuleData on 1.21.1+, ModuleItem NBT on 1.20.x — absorbed by SC).
+    public boolean hasAllowlistModule() { return isModuleEnabled(ModuleType.ALLOWLIST); }
+    public boolean hasDenylistModule()  { return isModuleEnabled(ModuleType.DENYLIST); }
 
     // -- Loot Inventory --
     public SimpleContainer getLootInventory() { return lootInventory; }
     public void setLootInventory(SimpleContainer inv) { this.lootInventory = inv; }
 
     public int getLootSlotCount() {
-        int storageLevel = getModuleCount(SLOT_STORAGE);
-        int rows = 1 + storageLevel;
-        return Math.min(rows, MAX_LOOT_ROWS) * 9;
+        int rows = hasStorageModule() ? MAX_LOOT_ROWS : 1;
+        return rows * 9;
     }
 
     public int getLootRows() {
@@ -364,7 +497,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             for (int i = needed; i < lootInventory.getContainerSize(); i++) {
                 ItemStack overflow = lootInventory.getItem(i);
                 if (!overflow.isEmpty() && level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+                    //? if >=1.21.8 {
                     spawnAtLocation(serverLevel, overflow);
+                    //?} else
+                    /*spawnAtLocation(overflow);*/
                 }
             }
         }
@@ -379,13 +515,85 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     }
 
     // -- Loot Password --
-    public String getLootPassword() { return lootPassword; }
-    public void setLootPassword(String pw) { this.lootPassword = pw != null ? pw : ""; }
-    public boolean hasLootPassword() { return !lootPassword.isEmpty(); }
+    // -- Loot passcode (api.IPasscodeProtected) --
+    @Override
+    public byte[] getPasscode() { return passcode == null || passcode.length == 0 ? null : passcode; }
+
+    @Override
+    public void setPasscode(byte[] passcode) { this.passcode = passcode; }
+
+    @Override
+    public UUID getSaltKey() { return saltKey; }
+
+    @Override
+    public void setSaltKey(UUID saltKey) { this.saltKey = saltKey; }
+
+    @Override
+    public void setSaveSalt(boolean saveSalt) { this.saveSalt = saveSalt; }
+
+    @Override
+    public boolean shouldSaveSalt() { return saveSalt; }
+
+    @Override
+    public void startCooldown() {
+        if (!isOnCooldown()) cooldownEnd = System.currentTimeMillis() + PASSCODE_COOLDOWN_MS;
+    }
+
+    @Override
+    public long getCooldownEnd() { return cooldownEnd; }
+
+    @Override
+    public boolean isOnCooldown() { return System.currentTimeMillis() < cooldownEnd; }
+
+    /** Called by SecurityCraft's CheckPasscode packet on a correct code — open the loot. */
+    @Override
+    public void activate(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) SCGuardGolem.openGolemMenu(serverPlayer, this);
+    }
+
+    // The passcode screens are pos-based in the API; an entity keys them on its id instead.
+    @Override
+    public void openPasscodeGUI(Level level, BlockPos pos, Player player) {
+        if (!level.isClientSide() && getPasscode() != null && player instanceof ServerPlayer serverPlayer)
+            sendPasscodeScreen(serverPlayer, OpenScreen.DataType.CHECK_PASSCODE_FOR_ENTITY);
+    }
+
+    @Override
+    public void openSetPasscodeScreen(ServerPlayer player, BlockPos pos) {
+        sendPasscodeScreen(player, OpenScreen.DataType.SET_PASSCODE_FOR_ENTITY);
+    }
+
+    private void sendPasscodeScreen(ServerPlayer player, OpenScreen.DataType type) {
+        OpenScreen pkt = new OpenScreen(type, getId());
+        //? if forge {
+        /*net.geforcemods.securitycraft.SecurityCraft.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(() -> player), pkt);
+        *///?} elif <1.21.1 {
+        /*net.neoforged.neoforge.network.PacketDistributor.PLAYER.with(player).send(pkt);
+        *///?} else {
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, pkt);
+        //?}
+    }
+
+    /** Owner opens loot directly (or sets a passcode); others must enter the passcode if one is set. */
+    public void openLoot(Player player) {
+        if (getPasscode() == null) {
+            if (isOwner(player)) {
+                if (player instanceof ServerPlayer serverPlayer) SCGuardGolem.openGolemMenu(serverPlayer, this);
+            }
+        } else {
+            openPasscodeGUI(level(), blockPosition(), player);
+        }
+    }
+
+    /** Owner-triggered: open the set-passcode screen for the loot lock. */
+    public void promptSetPasscode(Player player) {
+        if (isOwner(player) && player instanceof ServerPlayer serverPlayer)
+            openSetPasscodeScreen(serverPlayer, blockPosition());
+    }
 
     // -- Item Pickup --
     private void pickupNearbyItems() {
-        if (getModuleCount(SLOT_STORAGE) <= 0) return;
+        if (!hasStorageModule()) return;
         AABB pickupBox = getBoundingBox().inflate(2.0);
         List<ItemEntity> items = level().getEntitiesOfClass(ItemEntity.class, pickupBox);
         for (ItemEntity itemEntity : items) {
@@ -415,9 +623,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         }
     }
 
+    /**
+     * Recall complete: clear the flag and let the patrol carry on from waypoint 0.
+     * (It used to also switch patrol OFF, which parked the golem at its first
+     * waypoint "forever" with no way to resume from the GUI — the resume menu
+     * button was never wired — so a single bell ring read as a broken patrol.)
+     */
     public void finishRecall() {
         recalling = false;
-        setPatrolling(false);
     }
 
     // -- Patrol --
@@ -464,6 +677,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     public int getDwellTicks() { return dwellTicks; }
     public void setDwellTicks(int ticks) { this.dwellTicks = Math.max(0, Math.min(ticks, 200)); }
 
+    // -- Wander radius (roam around the waypoint while dwelling; 0 = stand still) --
+    public int getWanderRadius() { return wanderRadius; }
+    public void setWanderRadius(int r) { this.wanderRadius = Math.max(0, Math.min(r, 8)); }
+
     // -- Loot filter --
     public Set<String> getLootFilter() { return Collections.unmodifiableSet(lootFilter); }
     public void addLootFilter(String itemId) { if (itemId != null && !itemId.isBlank()) lootFilter.add(itemId); }
@@ -480,34 +697,62 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     public void setThreatMode(ThreatMode m) { entityData.set(THREAT_MODE, m.ordinal()); }
 
     // -- Drop everything on death --
+    //? if >=1.21.1 {
     @Override
     protected void dropAllDeathLoot(net.minecraft.server.level.ServerLevel level, net.minecraft.world.damagesource.DamageSource source) {
         super.dropAllDeathLoot(level, source);
         for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
             ItemStack stack = moduleInventory.getItem(i);
-            if (!stack.isEmpty()) spawnAtLocation(level, stack);
+            if (!stack.isEmpty()) dropStack(stack);
         }
         moduleInventory.clearContent();
         for (int i = 0; i < lootInventory.getContainerSize(); i++) {
             ItemStack stack = lootInventory.getItem(i);
-            if (!stack.isEmpty()) spawnAtLocation(level, stack);
+            if (!stack.isEmpty()) dropStack(stack);
         }
         lootInventory.clearContent();
     }
+    //?} else {
+    /*@Override
+    protected void dropAllDeathLoot(net.minecraft.world.damagesource.DamageSource source) {
+        super.dropAllDeathLoot(source);
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack stack = moduleInventory.getItem(i);
+            if (!stack.isEmpty()) dropStack(stack);
+        }
+        moduleInventory.clearContent();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack stack = lootInventory.getItem(i);
+            if (!stack.isEmpty()) dropStack(stack);
+        }
+        lootInventory.clearContent();
+    }
+    *///?}
+
+    /** spawnAtLocation across the 1.21.2 ServerLevel-parameter change. */
+    private void dropStack(ItemStack stack) {
+        //? if >=1.21.8 {
+        if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel)
+            spawnAtLocation(serverLevel, stack);
+        //?} else
+        /*spawnAtLocation(stack);*/
+    }
 
     // -- Persistence --
+    //? if >=1.21.8 {
     @Override
     public void addAdditionalSaveData(ValueOutput tag) {
         super.addAdditionalSaveData(tag);
-        tag.putString("GolemOwnerUUID", getOwnerUUID());
-        tag.putString("GolemOwnerName", getOwnerName());
+        tag.store("GolemOwner", Owner.CODEC, getOwner());
         tag.putBoolean("Patrolling", isPatrolling());
+        tag.putBoolean("ShutDown", isShutDown());
         tag.putDouble("PatrolSpeed", patrolSpeed);
         tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
         tag.putInt("ThreatMode", getThreatMode().ordinal());
-        tag.putString("LootPassword", lootPassword);
+        savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("WanderRadius", wanderRadius);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
 
         // Loot filter
@@ -516,15 +761,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
         int fi = 0;
         for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
         tag.store("LootFilter", CompoundTag.CODEC, filterTag);
-
-        CompoundTag listsTag = new CompoundTag();
-        listsTag.putInt("IgnoreCount", ignoreList.size());
-        int idx = 0;
-        for (String n : ignoreList) listsTag.putString("Ignore" + idx++, n);
-        listsTag.putInt("AttackCount", attackList.size());
-        idx = 0;
-        for (String n : attackList) listsTag.putString("Attack" + idx++, n);
-        tag.store("AllowDenyLists", CompoundTag.CODEC, listsTag);
 
         CompoundTag waypointTag = new CompoundTag();
         waypointTag.putInt("Count", waypoints.size());
@@ -544,15 +780,24 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
     @Override
     public void readAdditionalSaveData(ValueInput tag) {
         super.readAdditionalSaveData(tag);
-        entityData.set(OWNER_UUID, tag.getStringOr("GolemOwnerUUID", ""));
-        entityData.set(OWNER_NAME, tag.getStringOr("GolemOwnerName", ""));
+        Owner golemOwner = tag.read("GolemOwner", Owner.CODEC).orElse(null);
+        if (golemOwner == null) { // migrate legacy owner-string save data
+            String legacyUuid = tag.getStringOr("GolemOwnerUUID", "");
+            golemOwner = legacyUuid.isEmpty() ? new Owner()
+                    : new Owner(tag.getStringOr("GolemOwnerName", ""), legacyUuid);
+        }
+        entityData.set(OWNER, golemOwner);
         entityData.set(PATROLLING, tag.getBooleanOr("Patrolling", false));
+        entityData.set(SHUT_DOWN, tag.getBooleanOr("ShutDown", false));
         patrolSpeed = tag.getDoubleOr("PatrolSpeed", 1.0);
         currentWaypointIndex = tag.getIntOr("CurrentWaypointIndex", 0);
         entityData.set(THREAT_MODE, tag.getIntOr("ThreatMode", ThreatMode.WARN.ordinal()));
-        lootPassword = tag.getStringOr("LootPassword", "");
+        loadPasscodeAndSaltKey(tag);
+        String legacyPw = tag.getStringOr("LootPassword", "");
+        if (!legacyPw.isEmpty() && getPasscode() == null) hashAndSetPasscode(legacyPw);
         recalling = tag.getBooleanOr("Recalling", false);
         dwellTicks = tag.getIntOr("DwellTicks", 0);
+        wanderRadius = tag.getIntOr("WanderRadius", 0);
         savedWaypointIndex = tag.getIntOr("SavedWaypointIndex", 0);
 
         // Loot filter
@@ -561,16 +806,6 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
             int fc = ft.getIntOr("Count", 0);
             for (int i = 0; i < fc; i++) { String id = ft.getStringOr("Filter" + i, ""); if (!id.isEmpty()) lootFilter.add(id); }
         });
-
-        ignoreList.clear();
-        attackList.clear();
-        tag.read("AllowDenyLists", CompoundTag.CODEC).ifPresent(lt -> {
-            int ic = lt.getIntOr("IgnoreCount", 0);
-            for (int i = 0; i < ic; i++) { String n = lt.getStringOr("Ignore" + i, ""); if (!n.isEmpty()) ignoreList.add(n); }
-            int ac = lt.getIntOr("AttackCount", 0);
-            for (int i = 0; i < ac; i++) { String n = lt.getStringOr("Attack" + i, ""); if (!n.isEmpty()) attackList.add(n); }
-        });
-        syncLists();
 
         waypoints.clear();
         waypointsView = null;
@@ -593,4 +828,228 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider {
 
         if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
     }
+    //?} elif >=1.21.1 {
+    /*@Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        CompoundTag golemOwnerTag = new CompoundTag();
+        getOwner().save(golemOwnerTag, true);
+        tag.put("GolemOwner", golemOwnerTag);
+        tag.putBoolean("Patrolling", isPatrolling());
+        tag.putBoolean("ShutDown", isShutDown());
+        tag.putDouble("PatrolSpeed", patrolSpeed);
+        tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
+        tag.putInt("ThreatMode", getThreatMode().ordinal());
+        savePasscodeAndSalt(tag);
+        tag.putBoolean("Recalling", recalling);
+        tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("WanderRadius", wanderRadius);
+        tag.putInt("SavedWaypointIndex", savedWaypointIndex);
+
+        CompoundTag filterTag = new CompoundTag();
+        filterTag.putInt("Count", lootFilter.size());
+        int fi = 0;
+        for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
+        tag.put("LootFilter", filterTag);
+
+        CompoundTag waypointTag = new CompoundTag();
+        waypointTag.putInt("Count", waypoints.size());
+        for (int i = 0; i < waypoints.size(); i++) {
+            BlockPos wp = waypoints.get(i);
+            waypointTag.putInt("X" + i, wp.getX());
+            waypointTag.putInt("Y" + i, wp.getY());
+            waypointTag.putInt("Z" + i, wp.getZ());
+            waypointTag.putString("Name" + i, i < waypointNames.size() ? waypointNames.get(i) : "");
+        }
+        tag.put("Waypoints", waypointTag);
+
+        net.minecraft.nbt.ListTag moduleList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack s = moduleInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = (CompoundTag) s.save(registryAccess());
+                it.putInt("Slot", i);
+                moduleList.add(it);
+            }
+        }
+        tag.put("Modules", moduleList);
+
+        net.minecraft.nbt.ListTag lootList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack s = lootInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = (CompoundTag) s.save(registryAccess());
+                it.putInt("Slot", i);
+                lootList.add(it);
+            }
+        }
+        tag.put("LootItems", lootList);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        readCommonTag(tag);
+
+        moduleInventory.clearContent();
+        if (tag.contains("Modules")) {
+            net.minecraft.nbt.ListTag ml = tag.getList("Modules", 10);
+            for (int i = 0; i < ml.size(); i++) {
+                CompoundTag it = ml.getCompound(i);
+                final int slot = it.getInt("Slot");
+                ItemStack.parse(registryAccess(), it).ifPresent(s -> { if (slot >= 0 && slot < moduleInventory.getContainerSize()) moduleInventory.setItem(slot, s); });
+            }
+        }
+
+        applyUpgrades();
+        resizeLootInventory();
+
+        lootInventory.clearContent();
+        if (tag.contains("LootItems")) {
+            net.minecraft.nbt.ListTag ll = tag.getList("LootItems", 10);
+            for (int i = 0; i < ll.size(); i++) {
+                CompoundTag it = ll.getCompound(i);
+                final int slot = it.getInt("Slot");
+                ItemStack.parse(registryAccess(), it).ifPresent(s -> { if (slot >= 0 && slot < lootInventory.getContainerSize()) lootInventory.setItem(slot, s); });
+            }
+        }
+
+        if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
+    }
+    *///?} else {
+    /*@Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        CompoundTag golemOwnerTag = new CompoundTag();
+        getOwner().save(golemOwnerTag, true);
+        tag.put("GolemOwner", golemOwnerTag);
+        tag.putBoolean("Patrolling", isPatrolling());
+        tag.putBoolean("ShutDown", isShutDown());
+        tag.putDouble("PatrolSpeed", patrolSpeed);
+        tag.putInt("CurrentWaypointIndex", currentWaypointIndex);
+        tag.putInt("ThreatMode", getThreatMode().ordinal());
+        savePasscodeAndSalt(tag);
+        tag.putBoolean("Recalling", recalling);
+        tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("WanderRadius", wanderRadius);
+        tag.putInt("SavedWaypointIndex", savedWaypointIndex);
+
+        CompoundTag filterTag = new CompoundTag();
+        filterTag.putInt("Count", lootFilter.size());
+        int fi = 0;
+        for (String id : lootFilter) filterTag.putString("Filter" + fi++, id);
+        tag.put("LootFilter", filterTag);
+
+        CompoundTag waypointTag = new CompoundTag();
+        waypointTag.putInt("Count", waypoints.size());
+        for (int i = 0; i < waypoints.size(); i++) {
+            BlockPos wp = waypoints.get(i);
+            waypointTag.putInt("X" + i, wp.getX());
+            waypointTag.putInt("Y" + i, wp.getY());
+            waypointTag.putInt("Z" + i, wp.getZ());
+            waypointTag.putString("Name" + i, i < waypointNames.size() ? waypointNames.get(i) : "");
+        }
+        tag.put("Waypoints", waypointTag);
+
+        net.minecraft.nbt.ListTag moduleList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < moduleInventory.getContainerSize(); i++) {
+            ItemStack s = moduleInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = s.save(new CompoundTag());
+                it.putInt("Slot", i);
+                moduleList.add(it);
+            }
+        }
+        tag.put("Modules", moduleList);
+
+        net.minecraft.nbt.ListTag lootList = new net.minecraft.nbt.ListTag();
+        for (int i = 0; i < lootInventory.getContainerSize(); i++) {
+            ItemStack s = lootInventory.getItem(i);
+            if (!s.isEmpty()) {
+                CompoundTag it = s.save(new CompoundTag());
+                it.putInt("Slot", i);
+                lootList.add(it);
+            }
+        }
+        tag.put("LootItems", lootList);
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        readCommonTag(tag);
+
+        moduleInventory.clearContent();
+        if (tag.contains("Modules")) {
+            net.minecraft.nbt.ListTag ml = tag.getList("Modules", 10);
+            for (int i = 0; i < ml.size(); i++) {
+                CompoundTag it = ml.getCompound(i);
+                int slot = it.getInt("Slot");
+                ItemStack s = ItemStack.of(it);
+                if (!s.isEmpty() && slot >= 0 && slot < moduleInventory.getContainerSize()) moduleInventory.setItem(slot, s);
+            }
+        }
+
+        applyUpgrades();
+        resizeLootInventory();
+
+        lootInventory.clearContent();
+        if (tag.contains("LootItems")) {
+            net.minecraft.nbt.ListTag ll = tag.getList("LootItems", 10);
+            for (int i = 0; i < ll.size(); i++) {
+                CompoundTag it = ll.getCompound(i);
+                int slot = it.getInt("Slot");
+                ItemStack s = ItemStack.of(it);
+                if (!s.isEmpty() && slot >= 0 && slot < lootInventory.getContainerSize()) lootInventory.setItem(slot, s);
+            }
+        }
+
+        if (currentWaypointIndex >= waypoints.size()) currentWaypointIndex = 0;
+    }
+    *///?}
+
+    /** Shared CompoundTag reads for the pre-1.21.8 load paths. */
+    //? if <1.21.8 {
+    /*private void readCommonTag(CompoundTag tag) {
+        CompoundTag golemOwnerTag = tag.getCompound("GolemOwner");
+        if (!golemOwnerTag.isEmpty()) entityData.set(OWNER, Owner.fromCompound(golemOwnerTag));
+        else { // migrate legacy owner-string save data
+            String legacyUuid = tag.getString("GolemOwnerUUID");
+            entityData.set(OWNER, legacyUuid.isEmpty() ? new Owner()
+                    : new Owner(tag.getString("GolemOwnerName"), legacyUuid));
+        }
+        entityData.set(PATROLLING, tag.getBoolean("Patrolling"));
+        entityData.set(SHUT_DOWN, tag.getBoolean("ShutDown"));
+        patrolSpeed = tag.contains("PatrolSpeed") ? tag.getDouble("PatrolSpeed") : 1.0;
+        currentWaypointIndex = tag.getInt("CurrentWaypointIndex");
+        entityData.set(THREAT_MODE, tag.contains("ThreatMode") ? tag.getInt("ThreatMode") : ThreatMode.WARN.ordinal());
+        loadSaltKey(tag);
+        loadPasscode(tag);
+        String legacyPw = tag.getString("LootPassword");
+        if (!legacyPw.isEmpty() && getPasscode() == null) hashAndSetPasscode(legacyPw);
+        recalling = tag.getBoolean("Recalling");
+        dwellTicks = tag.getInt("DwellTicks");
+        wanderRadius = tag.getInt("WanderRadius");
+        savedWaypointIndex = tag.getInt("SavedWaypointIndex");
+
+        lootFilter.clear();
+        if (tag.contains("LootFilter")) {
+            CompoundTag ft = tag.getCompound("LootFilter");
+            int fc = ft.getInt("Count");
+            for (int i = 0; i < fc; i++) { String id = ft.getString("Filter" + i); if (!id.isEmpty()) lootFilter.add(id); }
+        }
+
+        waypoints.clear();
+        waypointNames.clear();
+        waypointsView = null;
+        if (tag.contains("Waypoints")) {
+            CompoundTag wc = tag.getCompound("Waypoints");
+            int count = wc.getInt("Count");
+            for (int i = 0; i < count; i++) {
+                waypoints.add(new BlockPos(wc.getInt("X" + i), wc.getInt("Y" + i), wc.getInt("Z" + i)));
+                waypointNames.add(wc.getString("Name" + i));
+            }
+        }
+    }
+    *///?}
 }

@@ -4,11 +4,11 @@ A **SecurityCraft** addon that adds a configurable **Security Guard Golem** with
 
 | | |
 |---|---|
-| **Minecraft** | See table below |
+| **Minecraft** | 1.20.1 – 26.2 (see table below) |
 | **Mod Loader** | NeoForge (Forge for 1.20.1) |
-| **SecurityCraft** | 1.9.x – 1.10.x depending on MC version |
-| **Java** | 21+ |
-| **Mod Version** | 1.4.0 |
+| **SecurityCraft** | 1.10.x (per MC version) |
+| **Java** | 17 / 21 / 25 (per MC version) |
+| **Mod Version** | 2.0.0-alpha.1 |
 
 ---
 
@@ -103,27 +103,48 @@ All commands require operator permissions (level 2).
 
 ## Supported Versions
 
-| Minecraft | Mod Loader | SecurityCraft | Branch |
+All versions build from a **single source tree** on `main` — see
+[ARCHITECTURE.md](ARCHITECTURE.md). Every target below, its loader/SecurityCraft
+pin, and its declared dependency ranges come from one source of truth,
+[`versions.matrix.toml`](versions.matrix.toml).
+
+| Minecraft | Loader | Java | SecurityCraft (built against) |
 |---|---|---|---|
-| **26.1** | NeoForge 26.1+ | 1.10.x | `mc/26.1` |
-| **1.21.11** | NeoForge 21.11+ | 1.10.x | `mc/1.21.11` |
-| **1.21.10** | NeoForge 21.10+ | 1.10.x | `mc/1.21.10` |
-| **1.21.8** | NeoForge 21.8+ | 1.10.x | `mc/1.21.8` |
-| **1.21.1** | NeoForge 21.1+ | 1.9.x | `mc/1.21.1` |
-| **1.20.4** | NeoForge 20.4+ | 1.9.x | `mc/1.20.4` |
-| **1.20.1** | Forge 47+ | 1.9.x | `mc/1.20.1` |
+| **26.2** | NeoForge 26.2.0.7-beta | 25 | 1.10.2.1-beta1 |
+| **26.1** | NeoForge 26.1.2.43-beta | 25 | 1.10.2.1 |
+| **1.21.11** | NeoForge 21.11.42 | 21 | 1.10.2.1 |
+| **1.21.10** | NeoForge 21.10.64 | 21 | 1.10.2.1 |
+| **1.21.8** | NeoForge 21.8.53 | 21 | 1.10.2.1 |
+| **1.21.1** | NeoForge 21.1.206 | 21 | 1.10.2.1 |
+| **1.20.4** | NeoForge 20.4.251 | 17 | 1.10.1 (upstream EOL) |
+| **1.20.1** | Forge 47.4.20 | 17 | 1.10.2.1 |
+
+The old per-version `mc/*` branches are frozen history; new work happens only on
+`main`.
 
 ---
 
 ## Building from Source
 
+The build uses [Stonecutter](https://stonecutter.kikugie.dev/) (multi-version
+switcher) + [ModDevGradle](https://github.com/neoforged/ModDevGradle). One clone
+builds every target.
+
 ```bash
-# Clone the branch for your target MC version
-git clone -b mc/26.1 https://github.com/GOD-GAMER/SCGuardGolem.git
+git clone https://github.com/GOD-GAMER/SCGuardGolem.git
 cd SCGuardGolem
-./gradlew build
-# Output JAR: build/libs/
+
+./gradlew buildAll               # build every target in versions.matrix.toml
+./gradlew ":26.1:build"          # build a single target
+                                 # jars land in versions/<target>/build/libs/
 ```
+
+Requires a JDK **21** to run Gradle (Stonecutter needs it); the per-target
+compiler toolchain (17 / 21 / 25) is provisioned automatically. Pass
+`-Pscg.decompile` for browsable Minecraft sources in the IDE (otherwise the
+faster binary pipeline is used). CI compiles, boots a dedicated server, and runs
+a gametest smoke suite for every target — see
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 

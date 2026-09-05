@@ -31,13 +31,14 @@ public class ModuleSlot extends Slot {
         return SecurityGolemEntity.isValidModuleForSlot(moduleSlotIndex, stack);
     }
 
+    // SecurityCraft modules are binary — one per slot, no stacking.
     @Override
     public int getMaxStackSize() {
-        return SecurityGolemEntity.MAX_UPGRADE_LEVEL;
+        return 1;
     }
 
     @Override
     public int getMaxStackSize(ItemStack stack) {
-        return SecurityGolemEntity.MAX_UPGRADE_LEVEL;
+        return 1;
     }
 }

@@ -1,0 +1,7 @@
+{
+  "parent": "securitycraft:item/taser",
+  "textures": {
+    "taser": "scguardgolem:item/emp_gun",
+    "particle": "scguardgolem:item/emp_gun"
+  }
+}

@@ -14,32 +14,70 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+//? if >=1.21.11
 import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.InteractionResult;
+//? if >=1.21.8
 import net.minecraft.world.entity.EntitySpawnReason;
+//? if >=1.21.11 {
 import net.minecraft.world.entity.animal.golem.IronGolem;
+//?} else
+/*import net.minecraft.world.entity.animal.IronGolem;*/
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.BellBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.geforcemods.securitycraft.api.SecurityCraftAPI;
+//? if forge {
+/*import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
+import net.minecraftforge.fml.InterModComms;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+*///?} elif <1.21.1 {
+/*import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.InterModComms;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.TickEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+*///?} else {
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
+import net.neoforged.fml.InterModComms;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+//?}
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 @Mod(SCGuardGolem.MODID)
+//? if forge {
+/*@Mod.EventBusSubscriber(modid = SCGuardGolem.MODID)
+*///?} elif <1.21.1 {
+/*@Mod.EventBusSubscriber(modid = SCGuardGolem.MODID)
+*///?} else {
 @EventBusSubscriber(modid = SCGuardGolem.MODID)
+//?}
 public class SCGuardGolem {
     public static final String MODID = "scguardgolem";
-    public static final String VERSION = "1.4.0";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public static boolean scLoaded;
@@ -54,10 +92,71 @@ public class SCGuardGolem {
     /** How often (ticks) route particles are sent to the holding player. */
     private static final int PARTICLE_INTERVAL = 3;
 
+    //? if forge {
+    /*public SCGuardGolem() {
+        IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
+        scLoaded = ModList.get().isLoaded("securitycraft");
+        SCGContent.register(modBus);
+        modBus.addListener(SCGuardGolem::onInterModEnqueue);
+        modBus.addListener(SCGManualPages::onInterModProcess);
+        LOGGER.info("SecurityCraft Guard Golem addon initialized");
+    }
+    *///?} else {
     public SCGuardGolem(IEventBus modBus) {
         scLoaded = ModList.get().isLoaded("securitycraft");
         SCGContent.register(modBus);
-        LOGGER.info("SecurityCraft Guard Golem addon initialized (MC 26.1)");
+        modBus.addListener(SCGuardGolem::onInterModEnqueue);
+        //? if >=1.21.8 {
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                SCGManualPages.syncPriority(), SCGManualPages::onDatapackSync);
+        //?} else
+        /*modBus.addListener(SCGManualPages::onInterModProcess);*/
+        LOGGER.info("SecurityCraft Guard Golem addon initialized");
+    }
+    //?}
+
+    /** Register the golem's threat rule with SecurityCraft's sentry-target registry. */
+    public static void onInterModEnqueue(InterModEnqueueEvent event) {
+        if (!scLoaded) return;
+        InterModComms.sendTo("securitycraft", SecurityCraftAPI.IMC_SENTRY_ATTACK_TARGET_MSG, GolemAttackTargetCheck::new);
+    }
+
+    /**
+     * Sends a chat message to a player. Player#sendSystemMessage does not exist
+     * on MC 1.21.10/1.21.11 (returned in 26.1); displayClientMessage covers the gap.
+     */
+    public static void msg(Player player, Component message) {
+        //? if >=1.21.8 && <26.1 {
+        /*player.displayClientMessage(message, false);
+        *///?} else {
+        player.sendSystemMessage(message);
+        //?}
+    }
+
+    /** Owner-or-op permission check for opening the golem GUI. */
+    public static boolean canConfigure(SecurityGolemEntity golem, Player player) {
+        //? if >=1.21.11 {
+        return golem.isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
+        //?} else
+        /*return golem.isOwner(player) || player.hasPermissions(2);*/
+    }
+
+    /** Opens the golem menu with its extra client-side data on every loader. */
+    public static void openGolemMenu(ServerPlayer serverPlayer, SecurityGolemEntity golem) {
+        //? if forge {
+        /*net.minecraftforge.network.NetworkHooks.openScreen(serverPlayer, golem, golem::writeMenuData);
+        *///?} else {
+        serverPlayer.openMenu(golem);
+        //?}
+    }
+
+    /** Opens a plain MenuProvider (no extra client data) on every loader — used for the tamed guard's loot. */
+    public static void openContainer(ServerPlayer serverPlayer, net.minecraft.world.MenuProvider provider) {
+        //? if forge {
+        /*net.minecraftforge.network.NetworkHooks.openScreen(serverPlayer, provider);
+        *///?} else {
+        serverPlayer.openMenu(provider);
+        //?}
     }
 
     @SubscribeEvent
@@ -76,13 +175,22 @@ public class SCGuardGolem {
         ItemStack held = player.getItemInHand(event.getHand());
 
         if (event.getTarget() instanceof SecurityGolemEntity golem && isWireCutters(held)) {
-            if (golem.isOwner(player) || player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)) {
+            if (canConfigure(golem, player)) {
                 if (player instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.openMenu(golem);
+                    openGolemMenu(serverPlayer, golem);
                 }
             } else {
-                player.sendSystemMessage(Component.literal("\u00a7c[Security Golem] You are not the owner."));
+                msg(player, Component.translatable("scguardgolem.not_owner").withStyle(net.minecraft.ChatFormatting.RED));
             }
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
+            return;
+        }
+
+        // Keycard on an eligible hostile mob → tame it into an owned guard.
+        if (isKeycardItem(held) && event.getTarget() instanceof net.minecraft.world.entity.monster.Monster monster
+                && isTameable(monster)) {
+            tameMob((ServerLevel) event.getLevel(), monster, player, held);
             event.setCancellationResult(InteractionResult.SUCCESS);
             event.setCanceled(true);
             return;
@@ -93,24 +201,67 @@ public class SCGuardGolem {
         if (!isKeycardItem(held)) return;
 
         ServerLevel serverLevel = (ServerLevel) event.getLevel();
+        //? if >=1.21.8 {
         SecurityGolemEntity golem = SCGContent.SECURITY_GOLEM.get()
                 .create(serverLevel, EntitySpawnReason.CONVERSION);
+        //?} else
+        /*SecurityGolemEntity golem = SCGContent.SECURITY_GOLEM.get().create(serverLevel);*/
         if (golem == null) return;
 
+        //? if >=1.21.8 {
         golem.snapTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
                 ironGolem.getYRot(), ironGolem.getXRot());
+        //?} else {
+        /*golem.moveTo(ironGolem.getX(), ironGolem.getY(), ironGolem.getZ(),
+                ironGolem.getYRot(), ironGolem.getXRot());
+        *///?}
         golem.setHealth(ironGolem.getHealth());
         golem.setPlayerCreated(ironGolem.isPlayerCreated());
         golem.setGolemOwner(player);
 
         ironGolem.discard();
         serverLevel.addFreshEntity(golem);
+        golem.startPowerUpFx(); // epic power-on: rising energy helix + totem burst
+        SCGFx.burst(serverLevel, ParticleTypes.FIREWORK, golem, 20, 0.4, 0.1);
+        SCGFx.sound(serverLevel, golem, SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 0.8F, 1.3F);
 
         held.shrink(1);
-        player.sendSystemMessage(Component.translatable("scguardgolem.conversion.success"));
+        msg(player, Component.translatable("scguardgolem.conversion.success"));
 
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
+    }
+
+    /** Eligible: a normal hostile mob (not a Creeper, not already a guard, not a boss). */
+    private static boolean isTameable(net.minecraft.world.entity.monster.Monster monster) {
+        if (monster instanceof net.minecraft.world.entity.monster.Creeper) return false;
+        if (monster instanceof net.geforcemods.scguardgolem.entity.TamedGuardEntity) return false;
+        // Boss guard: max health cap excludes Wardens/Withers etc.
+        return monster.getMaxHealth() <= 100.0F;
+    }
+
+    private static void tameMob(ServerLevel level, net.minecraft.world.entity.monster.Monster monster, Player player, ItemStack held) {
+        //? if >=1.21.8 {
+        var guard = SCGContent.TAMED_GUARD.get().create(level, EntitySpawnReason.CONVERSION);
+        //?} else
+        /*var guard = SCGContent.TAMED_GUARD.get().create(level);*/
+        if (guard == null) return;
+
+        //? if >=1.21.8 {
+        guard.snapTo(monster.getX(), monster.getY(), monster.getZ(), monster.getYRot(), monster.getXRot());
+        //?} else {
+        /*guard.moveTo(monster.getX(), monster.getY(), monster.getZ(), monster.getYRot(), monster.getXRot());
+        *///?}
+        guard.setGuardOwner(player);
+        guard.adoptStatsFrom(monster);
+
+        monster.discard();
+        level.addFreshEntity(guard);
+        guard.startPowerUpFx(); // epic power-on helix
+        SCGFx.burst(level, ParticleTypes.HEART, guard, 10, 0.4, 0.0);
+        SCGFx.sound(level, guard, SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.7F, 1.4F);
+        held.shrink(1);
+        msg(player, Component.translatable("scguardgolem.tamed.success"));
     }
 
     // -----------------------------------------------------------------------
@@ -128,17 +279,33 @@ public class SCGuardGolem {
         List<SecurityGolemEntity> golems = serverLevel.getEntitiesOfClass(SecurityGolemEntity.class, searchBox,
                 g -> g.isOwner(player) && !g.getWaypoints().isEmpty());
         if (!golems.isEmpty()) {
-            for (SecurityGolemEntity golem : golems) golem.recallToStart();
-            player.sendSystemMessage(Component.literal("\u00a76[Security Golem] \u00a7f" + golems.size() + " golem(s) recalled."));
+            for (SecurityGolemEntity golem : golems) {
+                golem.recallToStart();
+                SCGFx.burst(serverLevel, ParticleTypes.END_ROD, golem, 5, 0.3, 0.02);
+            }
+            BlockPos bell = event.getPos();
+            SCGFx.burst(serverLevel, ParticleTypes.END_ROD, bell.getX() + 0.5, bell.getY() + 1.0, bell.getZ() + 0.5, 10, 0.4, 0.02);
+            msg(player, Component.translatable("scguardgolem.golem_recalled", golems.size()).withStyle(net.minecraft.ChatFormatting.GOLD));
         }
     }
 
     // -----------------------------------------------------------------------
     //  Player tick: double-crouch waypoint placement + route particles
     // -----------------------------------------------------------------------
+    //? if forge || <1.21.1 {
+    /*@SubscribeEvent
+    public static void onPlayerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) return;
+        handlePlayerTick(event.player);
+    }
+    *///?} else {
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
-        Player player = event.getEntity();
+        handlePlayerTick(event.getEntity());
+    }
+    //?}
+
+    private static void handlePlayerTick(Player player) {
         if (!(player.level() instanceof ServerLevel serverLevel)) return;
 
         ItemStack held = player.getMainHandItem();
@@ -189,19 +356,18 @@ public class SCGuardGolem {
                 .orElse(null);
 
         if (nearest == null) {
-            player.sendSystemMessage(Component.literal("\u00a7c[Route] No nearby Security Golem found (within 64 blocks)."));
+            msg(player, Component.translatable("scguardgolem.route.no_golem").withStyle(net.minecraft.ChatFormatting.RED));
             return;
         }
 
         BlockPos pos = player.blockPosition();
         nearest.addWaypoint(pos);
         int num = nearest.getWaypoints().size();
-        player.sendSystemMessage(Component.literal(
-                "\u00a76[Route] \u00a7aWaypoint #" + num + " placed at \u00a7f" + pos.toShortString()));
+        msg(player, Component.translatable("scguardgolem.route.waypoint_placed", num, pos.toShortString()).withStyle(net.minecraft.ChatFormatting.GOLD));
 
         // Burst of happy-villager particles visible to the placing player
         if (player instanceof ServerPlayer sp) {
-            level.sendParticles(sp, ParticleTypes.HAPPY_VILLAGER, true, true,
+            particles(level, sp, ParticleTypes.HAPPY_VILLAGER,
                     pos.getX() + 0.5, pos.getY() + 1.2, pos.getZ() + 0.5,
                     12, 0.3, 0.3, 0.3, 0.0);
         }
@@ -235,9 +401,9 @@ public class SCGuardGolem {
 
             // Node marker: flame = current target, end_rod = others
             if (i == currentIdx) {
-                level.sendParticles(sp, ParticleTypes.FLAME, true, true, wx, wy, wz, 3, 0.1, 0.1, 0.1, 0.0);
+                particles(level, sp, ParticleTypes.FLAME, wx, wy, wz, 3, 0.1, 0.1, 0.1, 0.0);
             } else {
-                level.sendParticles(sp, ParticleTypes.END_ROD, true, true, wx, wy, wz, 2, 0.08, 0.08, 0.08, 0.0);
+                particles(level, sp, ParticleTypes.END_ROD, wx, wy, wz, 2, 0.08, 0.08, 0.08, 0.0);
             }
 
             // Line from this waypoint to the next (wraps around)
@@ -252,16 +418,26 @@ public class SCGuardGolem {
                     double lx = from.x + (to.x - from.x) * t;
                     double ly = from.y + (to.y - from.y) * t;
                     double lz = from.z + (to.z - from.z) * t;
-                    level.sendParticles(sp, ParticleTypes.END_ROD, true, true, lx, ly, lz, 1, 0, 0, 0, 0.0);
+                    particles(level, sp, ParticleTypes.END_ROD, lx, ly, lz, 1, 0, 0, 0, 0.0);
                 }
             }
         }
 
         // Preview dot at the player's own feet
         BlockPos pp = player.blockPosition();
-        level.sendParticles(sp, ParticleTypes.CRIT, true, true,
+        particles(level, sp, ParticleTypes.CRIT,
                 pp.getX() + 0.5, pp.getY() + 0.3, pp.getZ() + 0.5,
                 1, 0.15, 0.0, 0.15, 0.0);
+    }
+
+
+    /** ServerLevel#sendParticles gained a second boolean (alwaysShow) in 1.21.2. */
+    private static void particles(ServerLevel level, ServerPlayer sp, net.minecraft.core.particles.SimpleParticleType type,
+            double x, double y, double z, int count, double dx, double dy, double dz, double speed) {
+        //? if >=1.21.8 {
+        level.sendParticles(sp, type, true, true, x, y, z, count, dx, dy, dz, speed);
+        //?} else
+        /*level.sendParticles(sp, type, true, x, y, z, count, dx, dy, dz, speed);*/
     }
 
     // -----------------------------------------------------------------------
@@ -283,11 +459,5 @@ public class SCGuardGolem {
         } catch (NoClassDefFoundError e) {
             return false;
         }
-    }
-
-    public static boolean isPlayerTrustedByOwner(String playerUUID, String playerName,
-                                                  String ownerUUID, String ownerName) {
-        if (!scLoaded || ownerUUID == null || ownerUUID.isEmpty()) return false;
-        return ownerUUID.equals(playerUUID);
     }
 }

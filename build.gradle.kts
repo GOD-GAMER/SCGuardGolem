@@ -1,90 +1,119 @@
+import org.gradle.api.plugins.ExtensionAware
+import org.gradle.language.jvm.tasks.ProcessResources
+
+// Central per-node build script for every NEOFORGE target (the Forge 1.20.1
+// node uses build.forge.gradle.kts). The node's project name IS the target
+// name in versions.matrix.toml; all version data comes from that file.
 plugins {
-    id("net.neoforged.moddev") version "2.0.134"
-    id("net.darkhax.curseforgegradle") version "1.1.25"
+    id("net.neoforged.moddev") // version pinned in stonecutter.gradle.kts
+    id("neoforge-mutex")
 }
 
-val modId = "scguardgolem"
-val mcVersion: String by project
-val neoforgeVersion: String by project
-val scVersion: String by project
-val modVersion: String by project
+val target: String = project.name
 
-base {
-    archivesName.set("SecurityGolemAddon-${mcVersion}-SC${scVersion}")
-    version = modVersion
-}
+@Suppress("UNCHECKED_CAST")
+val matrixTargets = (gradle as ExtensionAware).extensions.extraProperties
+    .get("scg.matrix.targets") as Map<String, Map<String, String>>
 
-java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+@Suppress("UNCHECKED_CAST")
+val matrixShared = (gradle as ExtensionAware).extensions.extraProperties
+    .get("scg.matrix.shared") as Map<String, String>
 
-tasks.processResources {
-    exclude(".cache")
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-}
+val m = matrixTargets.getValue(target)
+val modVersion = providers.gradleProperty("modVersion").get()
 
-tasks.jar {
-    manifest {
-        attributes(
-            "Specification-Title" to "SCGuardGolem",
-            "Specification-Version" to project.version,
-            "Implementation-Title" to "SCGuardGolem",
-            "Implementation-Version" to project.version
-        )
-    }
+version = modVersion
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(m.getValue("java").toInt())
 }
 
 neoForge {
-    version = neoforgeVersion
+    enable {
+        version = m.getValue("loader_min")
+        // Binary pipeline: skip Vineflower decompile + recompile (OOM-prone with
+        // 8 targets; also MDG's default when CI=true). Pass -Pscg.decompile for
+        // browsable Minecraft sources in the IDE.
+        setDisableRecompilation(!providers.gradleProperty("scg.decompile").isPresent)
+    }
 
     runs {
-        configureEach {
-            logLevel = org.slf4j.event.Level.DEBUG
-            gameDirectory = file("run/" + name)
-        }
-
         register("client") {
             client()
+            systemProperty("neoforge.enabledGameTestNamespaces", "scguardgolem")
         }
-
         register("server") {
             server()
             programArgument("-nogui")
+            systemProperty("neoforge.enabledGameTestNamespaces", "scguardgolem")
+        }
+        register("gameTestServer") {
+            type = "gameTestServer"
+            systemProperty("neoforge.enabledGameTestNamespaces", "scguardgolem")
+        }
+        configureEach {
+            gameDirectory = file("run/$name")
+            logLevel = org.slf4j.event.Level.INFO
         }
     }
 
     mods {
-        create(modId) {
+        register("scguardgolem") {
             sourceSet(sourceSets.main.get())
         }
     }
 }
 
 repositories {
-    flatDir {
-        dirs("libs")
-    }
+    maven("https://www.cursemaven.com") { content { includeGroup("curse.maven") } }
+    maven("https://api.modrinth.com/maven") { content { includeGroup("maven.modrinth") } }
 }
 
 dependencies {
-    compileOnly(fileTree("libs") { include("*.jar") })
+    // Pinned published SecurityCraft build for this target (see versions.matrix.toml).
+    // implementation => on the compile classpath AND loaded as a mod in dev runs.
+    implementation(ScgMatrix.securityCraftCoordinate(matrixShared, m))
 }
 
-// Add SC jar to dev runtime so runClient can find it
-configurations.named("runtimeClasspath") {
-    extendsFrom(configurations.getByName("compileOnly"))
+// MDG must decompile/patch against the Stonecutter-generated sources.
+tasks.matching { it.name == "createMinecraftArtifacts" }.configureEach {
+    dependsOn("stonecutterGenerate")
 }
 
-tasks.register("curseforge", net.darkhax.curseforgegradle.TaskPublishCurseForge::class) {
-    dependsOn(tasks.jar)
-    disableVersionDetection()
-    apiToken = findProperty("curseforgeApiToken") as String?
-        ?: System.getenv("CURSEFORGE_TOKEN") ?: ""
+// Allow `echo stop | gradlew :<target>:runServer` for the CI LOAD rung.
+tasks.matching { it.name == "runServer" }.configureEach {
+    if (this is JavaExec) standardInput = System.`in`
+}
 
-    val projectId = (findProperty("curseforgeProjectId") as String?)?.toIntOrNull() ?: 0
-    val mainFile = upload(projectId, tasks.jar.get().archiveFile)
-    mainFile.releaseType = "release"
-    mainFile.addModLoader("NeoForge")
-    mainFile.addGameVersion(mcVersion)
-    mainFile.changelog = "See https://github.com/GOD-GAMER/SCGuardGolem/blob/mc/${mcVersion}/CHANGELOG.md"
-    mainFile.changelogType = "markdown"
-    mainFile.addRequirement("security-craft")
+tasks.named<Jar>("jar") {
+    archiveBaseName = "SecurityGolemAddon-$target-SC${m.getValue("sc_version")}"
+    manifest {
+        attributes(
+            "Specification-Title" to "SCGuardGolem",
+            "Specification-Version" to modVersion,
+            "Implementation-Title" to "SCGuardGolem",
+            "Implementation-Version" to modVersion,
+        )
+    }
+}
+
+// Generated metadata: ONE template, tokens computed from the matrix. The
+// declared lower bounds are by construction the versions compiled against.
+val metaTokens = ScgMatrix.metadataTokens(m, modVersion)
+
+tasks.named<ProcessResources>("processResources") {
+    inputs.properties(metaTokens)
+    from(rootProject.file("templates/mods.toml.tpl")) {
+        into("META-INF")
+        rename { m.getValue("metadata_file").substringAfterLast('/') }
+        expand(metaTokens)
+    }
+    val packFormat = m["pack_format"]
+    if (!packFormat.isNullOrBlank()) {
+        inputs.property("packFormat", packFormat)
+        from(rootProject.file("templates/pack.mcmeta.tpl")) {
+            rename { "pack.mcmeta" }
+            expand(mapOf("packFormat" to packFormat))
+        }
+    }
 }

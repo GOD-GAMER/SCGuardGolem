@@ -22,7 +22,7 @@ public class BadgeCheckGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        return golem.isScanTick() && golem.getTarget() == null;
+        return !golem.isShutDown() && golem.isScanTick() && golem.getTarget() == null;
     }
 
     @Override
@@ -38,17 +38,10 @@ public class BadgeCheckGoal extends Goal {
         for (Player player : nearbyPlayers) {
             if (!golem.getSensing().hasLineOfSight(player)) continue;
 
-            String playerName = player.getName().getString();
-
-            if (golem.isOnAlwaysAttackList(playerName)) { handleUntrustedPlayer(player); continue; }
-            if (golem.isOnIgnoreList(playerName)) continue;
+            // Deny list forces a threat; allow list and ownership (incl. SC teams) exempt.
+            if (golem.isDenied(player)) { handleUntrustedPlayer(player); continue; }
+            if (golem.isAllowed(player)) continue;
             if (golem.isOwner(player)) continue;
-
-            if (SCGuardGolem.isPlayerTrustedByOwner(
-                    player.getGameProfile().id().toString(),
-                    playerName,
-                    golem.getOwnerUUID(),
-                    golem.getOwnerName())) continue;
 
             handleUntrustedPlayer(player);
         }
@@ -57,7 +50,7 @@ public class BadgeCheckGoal extends Goal {
     private void handleUntrustedPlayer(Player player) {
         ThreatMode mode = golem.getThreatMode();
         switch (mode) {
-            case WARN -> player.sendSystemMessage(
+            case WARN -> SCGuardGolem.msg(player,
                     Component.translatable("scguardgolem.badge_check.halt"));
             case FOLLOW, ATTACK -> golem.setTarget(player);
         }

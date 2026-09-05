@@ -1,0 +1,206 @@
+# =============================================================================
+# SCGuardGolem — Version Matrix
+# -----------------------------------------------------------------------------
+# Single source of truth for every supported target. Two consumers:
+#   1. Dependency resolution — which SecurityCraft / loader artifact to compile against.
+#   2. Metadata token substitution — the versionRange values stamped into the
+#      generated neoforge.mods.toml (mods.toml for the 1.20.1 and 1.20.4 targets —
+#      NeoForge only renamed the file to neoforge.mods.toml in 20.5; 20.4 still
+#      reads META-INF/mods.toml, same as Forge).
+#
+# RULE: the `*_min` value you ship as a dependency lower bound MUST be the version
+# you compiled against for that target. Do not let them drift.
+#   (This rule is not theoretical: the currently-published "1.21.11" and "1.21.10"
+#   v1.2.0+ builds carry 26.1 source and declare neoforge "[26,)" / minecraft
+#   "[26.1,)". They cannot load on real 1.21.11 / 1.21.10 installs. CI rung 2
+#   exists to make that class of bug impossible.)
+#
+# Every value below was pulled from a published artifact on 2026-07-12:
+#   - SecurityCraft file ids: CurseForge project 64760 file list + Modrinth API
+#     (project v8jzRtAt). Latest per target as of 2026-07-12 = v1.10.2.1
+#     (published 2026-06-28) everywhere except 1.20.4 (EOL at v1.10.1) and
+#     26.2 (v1.10.2.1-beta1).
+#   - Loader versions: verified to exist on maven.neoforged.net /
+#     maven.minecraftforge.net (HTTP 200 on the .pom), and match what
+#     SecurityCraft's own branch of the same MC version builds against.
+#   - Java versions: from SecurityCraft's per-branch build files
+#     (17 → 1.20.x, 21 → 1.21.x INCLUDING 1.21.11, 25 → 26.x).
+#
+# NOTE the README's old split ("SC 1.9.x below 1.21.8, 1.10.x above") is stale:
+# SecurityCraft now publishes v1.10.2.x for every still-supported MC version,
+# including 1.20.1. Lower bounds below reflect what is actually published.
+#
+# Curse Maven coord form:   curse.maven:security-craft-64760:<sc_curse_fileId>
+#   (verified resolvable: HTTP 200 on cursemaven.com for fileId 8336498)
+# Modrinth Maven coord form: maven.modrinth:security-craft:<sc_modrinth_versionId>
+# =============================================================================
+
+[securitycraft]
+curse_slug          = "security-craft"   # curseforge.com/minecraft/mc-mods/security-craft
+curse_projectId     = 64760              # confirmed via cfwidget + cursemaven resolution
+modrinth_slug       = "security-craft"
+modrinth_projectId  = "v8jzRtAt"
+
+
+# ---- 1.20.1 -----------------------------------------------------------------
+# ONLY Forge target. SecurityCraft's 1.20.1 jar is dual-tagged Forge+NeoForge on
+# CurseForge (NeoForge 1.20.1 reads the same META-INF/mods.toml), so one metadata
+# file covers both. SC's 1.20.1 branch builds with ForgeGradle 6 against Forge
+# 1.20.1-47.4.20; we use ModDevGradle Legacy (net.neoforged.moddev.legacyforge)
+# against the same Forge version. The SC release jar is SRG-obfuscated on this
+# target — it must go through MDG-legacy's remapping configuration
+# (obfuscation.createRemappingConfiguration), the MDG equivalent of fg.deobf.
+[targets."1.20.1"]
+loader              = "forge"
+java                = 17
+mc_min              = "1.20.1"
+mc_max              = "1.20.2"           # next target line; tested promise, not a guess
+loader_min          = "47.4.20"          # what SC 1.20.1 builds against; verified on maven
+loader_artifact     = "net.minecraftforge:forge:1.20.1-47.4.20"
+sc_version          = "1.10.2.1"         # [1.20.1] SecurityCraft v1.10.2.1.jar, 2026-06-28
+sc_min              = "1.10.2.1"
+sc_max              = "1.11"             # cap at next SC minor
+sc_curse_fileId     = 8336490
+sc_modrinth_versionId = "PhNy7dJx"
+metadata_file       = "META-INF/mods.toml"
+fml_loader_range    = "[47,)"            # javafml language version on Forge 1.20.1
+pack_format         = "15"               # resource pack format for 1.20.1
+
+# ---- 1.20.4 -----------------------------------------------------------------
+# EOL upstream: SecurityCraft's 1.20.4 branch is archived (eol/1.20.4) and its
+# last published file is v1.10.1 (2025-10-25). Still NeoForge-with-mods.toml
+# (the neoforge.mods.toml rename happened in NeoForge 20.5). ListModuleData does
+# not exist here — allow/deny goes through IModuleInventory.isAllowed/isDenied,
+# which this SC version backs with ModuleItem NBT helpers (same call sites work).
+[targets."1.20.4"]
+loader              = "neoforge"
+java                = 17
+mc_min              = "1.20.4"
+mc_max              = "1.20.5"
+loader_min          = "20.4.251"         # addon's proven build pin; 20.4.241 (SC's) also verified
+loader_artifact     = "net.neoforged:neoforge:20.4.251"
+sc_version          = "1.10.1"           # last file ever published for 1.20.4
+sc_min              = "1.10.1"
+sc_max              = "1.11"
+sc_curse_fileId     = 7148565
+sc_modrinth_versionId = "RmTpBEo1"
+metadata_file       = "META-INF/mods.toml"
+fml_loader_range    = "[2,)"             # javafml language version on NeoForge 20.4
+pack_format         = "22"               # resource pack format for 1.20.4
+
+# ---- 1.21.1 -----------------------------------------------------------------
+[targets."1.21.1"]
+loader              = "neoforge"
+java                = 21
+mc_min              = "1.21.1"
+mc_max              = "1.21.2"
+loader_min          = "21.1.206"         # SC 1.21.1 branch pin; verified on maven
+loader_artifact     = "net.neoforged:neoforge:21.1.206"
+sc_version          = "1.10.2.1"
+sc_min              = "1.10.2.1"
+sc_max              = "1.11"
+sc_curse_fileId     = 8336498
+sc_modrinth_versionId = "X9nq0PvS"
+metadata_file       = "META-INF/neoforge.mods.toml"
+fml_loader_range    = "[4,)"             # FML 4 (NeoForge 21.1) still REQUIRES the
+                                         # modLoader/loaderVersion header; without it the whole
+                                         # file is rejected ("not a valid mod file"). The header
+                                         # became optional on 1.21.8+ (those targets omit this).
+
+# ---- 1.21.8 -----------------------------------------------------------------
+# First target on the ValueInput/ValueOutput save API and the 7-field
+# SCManualPage (recipes supplier). See ARCHITECTURE.md §5 boundary table.
+[targets."1.21.8"]
+loader              = "neoforge"
+java                = 21
+mc_min              = "1.21.8"
+mc_max              = "1.21.9"
+loader_min          = "21.8.53"          # SC 1.21.8 branch pin; verified on maven
+loader_artifact     = "net.neoforged:neoforge:21.8.53"
+sc_version          = "1.10.2.1"
+sc_min              = "1.10.2.1"
+sc_max              = "1.11"
+sc_curse_fileId     = 8336500
+sc_modrinth_versionId = "VMWNMthn"
+metadata_file       = "META-INF/neoforge.mods.toml"
+
+# ---- 1.21.10 ----------------------------------------------------------------
+# Last target using ResourceLocation (the Identifier rename lands in 1.21.11).
+# NOTE: the current mc/1.21.10 branch head and its v1.2.0+ tags actually carry
+# 26.1 source — real 1.21.10 support has to be rebuilt from the shared source
+# tree, not salvaged from that branch.
+[targets."1.21.10"]
+loader              = "neoforge"
+java                = 21
+mc_min              = "1.21.10"
+mc_max              = "1.21.11"
+loader_min          = "21.10.64"         # 21.10.63 (SC's pin) has binary patches incompatible
+                                         # with MDG 2.0.141's NFRT rename output (checksum
+                                         # mismatch on OctahedralGroup); 21.10.64 resolves it.
+loader_artifact     = "net.neoforged:neoforge:21.10.64"
+sc_version          = "1.10.2.1"
+sc_min              = "1.10.2.1"
+sc_max              = "1.11"
+sc_curse_fileId     = 8336502
+sc_modrinth_versionId = "TxTz0r3I"
+metadata_file       = "META-INF/neoforge.mods.toml"
+
+# ---- 1.21.11 ----------------------------------------------------------------
+# DECISION (was an open question): 1.21.11 and 26.1 STAY DISTINCT TARGETS.
+# The source may well remain identical (it was byte-identical before), but they
+# compile against different MC/NeoForge artifact sets (21.11.x vs 26.1.x), ship
+# different dependency ranges, and SecurityCraft publishes separate files for
+# each. Collapsing them is exactly what produced today's broken "1.21.11" build
+# (26.1 metadata on a 1.21.11 upload). Under a single-branch build an extra
+# target row costs one matrix entry, so there is no duplication left to save.
+# Java: 21, NOT 25 — confirmed from SecurityCraft's own 1.21.11 branch toolchain.
+[targets."1.21.11"]
+loader              = "neoforge"
+java                = 21
+mc_min              = "1.21.11"
+mc_max              = "26.1"             # 26.x sorts above 1.x in maven ordering; cap works
+loader_min          = "21.11.42"         # SC 1.21.11 branch pin; verified on maven
+loader_artifact     = "net.neoforged:neoforge:21.11.42"
+sc_version          = "1.10.2.1"
+sc_min              = "1.10.2.1"
+sc_max              = "1.11"
+sc_curse_fileId     = 8336503
+sc_modrinth_versionId = "RIK2Guyo"
+metadata_file       = "META-INF/neoforge.mods.toml"
+
+# ---- 26.1 -------------------------------------------------------------------
+# The currently-shipped newest target of the addon. SC's 26.1 branch builds
+# against MC 26.1.2 / NeoForge 26.1.2.43-beta and declares mc_min 26.1 — we
+# mirror that (mc range [26.1,26.2)). SC's own declared NeoForge floor is
+# 26.1.2.21-beta; per the RULE we ship the version we compile against.
+[targets."26.1"]
+loader              = "neoforge"
+java                = 25
+mc_min              = "26.1"
+mc_max              = "26.2"
+loader_min          = "26.1.2.43-beta"   # SC 26.1 branch pin; verified on maven
+loader_artifact     = "net.neoforged:neoforge:26.1.2.43-beta"
+sc_version          = "1.10.2.1"         # [26.1.2] SecurityCraft v1.10.2.1.jar
+sc_min              = "1.10.2.1"
+sc_max              = "1.11"
+sc_curse_fileId     = 8336505
+sc_modrinth_versionId = "QCOvaaCR"
+metadata_file       = "META-INF/neoforge.mods.toml"
+
+# ---- 26.2 (newest snapshot line) ---------------------------------------------
+# NEW target (the addon has never shipped for 26.2; SecurityCraft's default
+# branch is 26.2). Everything here is beta: SC v1.10.2.1-beta1, NeoForge
+# 26.2.0.7-beta. Identifier rename already handled since 1.21.11.
+[targets."26.2"]
+loader              = "neoforge"
+java                = 25
+mc_min              = "26.2"
+mc_max              = ""                 # newest line: open upper bound [26.2,)
+loader_min          = "26.2.0.7-beta"    # SC 26.2 branch pin; verified on maven
+loader_artifact     = "net.neoforged:neoforge:26.2.0.7-beta"
+sc_version          = "1.10.2.1-beta1"
+sc_min              = "1.10.2.1-beta1"
+sc_max              = "1.11"
+sc_curse_fileId     = 8336507
+sc_modrinth_versionId = "ZjFXXBh8"
+metadata_file       = "META-INF/neoforge.mods.toml"

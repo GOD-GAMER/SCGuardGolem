@@ -11,7 +11,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.LivingEntity;
+//? if >=1.20.5 {
 import net.minecraft.network.RegistryFriendlyByteBuf;
+//?} else
+/*import net.minecraft.network.FriendlyByteBuf;*/
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -29,7 +32,8 @@ public class GolemMenu extends AbstractContainerMenu {
     private static final int DATA_PATROL = 0;
     private static final int DATA_THREAT = 1;
     private static final int DATA_DWELL  = 2;
-    private static final int DATA_COUNT  = 3;
+    private static final int DATA_WANDER = 3;
+    private static final int DATA_COUNT  = 4;
 
     public static final int TAB_CONFIG = 0;
     public static final int TAB_LOOT = 1;
@@ -49,7 +53,8 @@ public class GolemMenu extends AbstractContainerMenu {
     // ?? Config tab slot positions (relative to GUI top-left) ??
     public static final int MOD_X = 8;
     public static final int MOD_Y = 20;
-    public static final int MOD_COL = 50;  // 18px slot + 32px label space
+    public static final int MOD_COL = 50;  // legacy 2-col spacing (kept for screen refs)
+    public static final int MOD_COL_TIGHT = 54; // 3-col spacing for 6 module slots
     public static final int MOD_ROW = 28;  // 18px slot + 10px gap for label below
 
     // Config content bottom (modules + buttons + status)
@@ -75,6 +80,7 @@ public class GolemMenu extends AbstractContainerMenu {
                     case DATA_PATROL -> golem.isPatrolling() ? 1 : 0;
                     case DATA_THREAT -> golem.getThreatMode().ordinal();
                     case DATA_DWELL  -> golem.getDwellTicks();
+                    case DATA_WANDER -> golem.getWanderRadius();
                     default -> 0;
                 };
             }
@@ -83,18 +89,20 @@ public class GolemMenu extends AbstractContainerMenu {
                     case DATA_PATROL -> golem.setPatrolling(value != 0);
                     case DATA_THREAT -> golem.setThreatMode(SecurityGolemEntity.ThreatMode.fromOrdinal(value));
                     case DATA_DWELL  -> golem.setDwellTicks(Math.max(0, value));
+                    case DATA_WANDER -> golem.setWanderRadius(Math.max(0, value));
                 }
             }
             @Override public int getCount() { return DATA_COUNT; }
         };
         addDataSlots(this.data);
 
-        // ?? Module slots (visible on CONFIG tab) — 2x2 grid ??
+        // Module slots (visible on CONFIG tab) â€” 3x2 grid for the 6 SC module types
         for (int row = 0; row < 2; row++) {
-            for (int col = 0; col < 2; col++) {
-                int index = row * 2 + col;
+            for (int col = 0; col < 3; col++) {
+                int index = row * 3 + col;
+                if (index >= moduleContainer.getContainerSize()) continue;
                 ModuleSlot ms = new ModuleSlot(moduleContainer, index,
-                        MOD_X + col * MOD_COL,
+                        MOD_X + col * MOD_COL_TIGHT,
                         MOD_Y + row * MOD_ROW);
                 ms.setActiveCheck(() -> currentTab == TAB_CONFIG);
                 addSlot(ms);
@@ -141,17 +149,26 @@ public class GolemMenu extends AbstractContainerMenu {
         }
     }
 
-    /** Client-side factory — reads entity ID + lootRows from the network buffer. */
+    /** Client-side factory â€” reads entity ID + lootRows from the network buffer. */
+    //? if >=1.20.5 {
     public GolemMenu(int containerId, Inventory playerInv, RegistryFriendlyByteBuf buf) {
         this(containerId, playerInv, prepareGolemFromBuf(playerInv, buf));
     }
+    //?} else {
+    /*public GolemMenu(int containerId, Inventory playerInv, FriendlyByteBuf buf) {
+        this(containerId, playerInv, prepareGolemFromBuf(playerInv, buf));
+    }
+    *///?}
 
     /**
      * Reads the buffer written by {@code SecurityGolemEntity.writeClientSideData},
      * finds the entity on the client, and ensures its loot container is correctly
      * sized (the client-side entity hasn't run {@code resizeLootInventory}).
      */
+    //? if >=1.20.5
     private static SecurityGolemEntity prepareGolemFromBuf(Inventory playerInv, RegistryFriendlyByteBuf buf) {
+    //? if <1.20.5
+    /*private static SecurityGolemEntity prepareGolemFromBuf(Inventory playerInv, FriendlyByteBuf buf) {*/
         int entityId = buf.readInt();
         int serverLootRows = buf.readInt();
         // Waypoints
@@ -259,34 +276,8 @@ public class GolemMenu extends AbstractContainerMenu {
             setTab(buttonId - 200);
             return true;
         }
-        // Remove from ignore list: button IDs 300+
-        if (buttonId >= 300 && buttonId < 400) {
-            int idx = buttonId - 300;
-            List<String> names = new ArrayList<>(golem.getIgnoreListNames());
-            if (idx >= 0 && idx < names.size()) golem.removeFromIgnoreList(names.get(idx));
-            return true;
-        }
-        // Remove from attack list: button IDs 400+
-        if (buttonId >= 400 && buttonId < 500) {
-            int idx = buttonId - 400;
-            List<String> names = new ArrayList<>(golem.getAlwaysAttackListNames());
-            if (idx >= 0 && idx < names.size()) golem.removeFromAttackList(names.get(idx));
-            return true;
-        }
-        // Add to ignore list by picker index: button IDs 500+
-        if (buttonId >= 500 && buttonId < 600) {
-            int idx = buttonId - 500;
-            List<String> available = getAvailableEntityNames(player);
-            if (idx >= 0 && idx < available.size()) golem.addToIgnoreList(available.get(idx));
-            return true;
-        }
-        // Add to attack list by picker index: button IDs 600+
-        if (buttonId >= 600 && buttonId < 700) {
-            int idx = buttonId - 600;
-            List<String> available = getAvailableEntityNames(player);
-            if (idx >= 0 && idx < available.size()) golem.addToAttackList(available.get(idx));
-            return true;
-        }
+        // Allow/deny are now SecurityCraft ALLOWLIST/DENYLIST modules â€” edit them
+        // via SC's own list-module screen, not through this menu (button IDs 300-699 retired).
         // Remove waypoint by index: button IDs 700+
         if (buttonId >= 700 && buttonId < 800) {
             int idx = buttonId - 700;
@@ -296,6 +287,9 @@ public class GolemMenu extends AbstractContainerMenu {
         // Dwell time: 800 = decrease by 1 s, 801 = increase by 1 s
         if (buttonId == 800) { golem.setDwellTicks(Math.max(0, golem.getDwellTicks() - 20)); return true; }
         if (buttonId == 801) { golem.setDwellTicks(golem.getDwellTicks() + 20); return true; }
+        // Wander radius: 802 = decrease by 1 block, 803 = increase by 1 block (0 = stand still)
+        if (buttonId == 802) { golem.setWanderRadius(golem.getWanderRadius() - 1); return true; }
+        if (buttonId == 803) { golem.setWanderRadius(golem.getWanderRadius() + 1); return true; }
         // Remove loot filter entry: button IDs 900+
         if (buttonId >= 900 && buttonId < 1000) {
             int idx = buttonId - 900;
@@ -312,39 +306,13 @@ public class GolemMenu extends AbstractContainerMenu {
         return false;
     }
 
-    private List<String> getAvailableEntityNames(Player player) {
-        Set<String> existing = new LinkedHashSet<>();
-        existing.addAll(golem.getIgnoreListNames());
-        existing.addAll(golem.getAlwaysAttackListNames());
-
-        Set<String> seen = new LinkedHashSet<>();
-        List<String> names = new ArrayList<>();
-
-        // Online players
-        var server = golem.level().getServer();
-        if (server != null) {
-            for (var sp : server.getPlayerList().getPlayers()) {
-                String name = sp.getName().getString();
-                if (!existing.contains(name) && seen.add(name)) names.add(name);
-            }
-        }
-
-        // All living entities in golem's level
-        var level = golem.level();
-        for (var e : level.getEntitiesOfClass(LivingEntity.class,
-                golem.getBoundingBox().inflate(128.0),
-                e -> e.isAlive() && e != golem && !(e instanceof net.minecraft.world.entity.player.Player))) {
-            String name = e.getName().getString();
-            if (!existing.contains(name) && seen.add(name)) names.add(name);
-        }
-        return names;
-    }
-
     public SecurityGolemEntity getGolem() { return golem; }
     public int getLootRows() { return lootContainer.getContainerSize() / 9; }
     public ContainerData getData() { return data; }
     /** Returns dwell ticks from the synced ContainerData (safe to call client-side). */
     public int getSyncedDwellTicks() { return data.get(DATA_DWELL); }
+    /** Returns the wander radius (blocks) from the synced ContainerData (safe to call client-side). */
+    public int getSyncedWanderRadius() { return data.get(DATA_WANDER); }
     public int getPlayerInvY() { return playerInvY; }
     public int getGuiHeight() { return playerInvY + 83; }
 }
