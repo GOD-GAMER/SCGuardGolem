@@ -364,10 +364,10 @@ public class TamedGuardEntity extends Zombie implements MenuProvider, IGuardEnti
     }
 
     // -- MenuProvider: a plain chest GUI over the loot container --
-    @Override
-    public net.minecraft.network.chat.Component getDisplayName() {
-        return net.minecraft.network.chat.Component.translatable("scguardgolem.tamed_guard");
-    }
+    // No getDisplayName() override on purpose — it is the same method as
+    // Entity.getDisplayName(), so overriding it would replace the mob's real name
+    // (and any custom name tag) with a fixed string. Entity's implementation
+    // satisfies MenuProvider and titles the loot chest correctly.
 
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player player) {

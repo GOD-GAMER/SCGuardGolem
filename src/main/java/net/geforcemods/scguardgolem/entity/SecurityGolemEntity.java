@@ -294,10 +294,12 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
     }
 
     // -- MenuProvider --
-    @Override
-    public Component getDisplayName() {
-        return Component.translatable("scguardgolem.gui.title");
-    }
+    // NOTE: deliberately NO getDisplayName() override. MenuProvider.getDisplayName()
+    // and Entity.getDisplayName() are the same method, so overriding it to return the
+    // GUI title renamed the MOB itself ("Summoned new Security Golem Configuration",
+    // death messages, name tags). Entity's own implementation satisfies MenuProvider
+    // and keeps the real entity name + custom name-tag support; GolemScreen never
+    // shows the menu title anyway (it sets titleLabelY = 999 and draws per-tab titles).
 
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInv, Player player) {
