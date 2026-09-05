@@ -1,0 +1,104 @@
+name: Publish to CurseForge
+
+# Publishing runs off a GitHub Release. Tags follow the existing scheme
+#   v<MODVER>-mc<MCVER>      e.g. v2.0.0-mc26.1
+# which is what the CurseForge upload derives the game version + loader from.
+#
+# The CurseForge credential is the repository secret CURSEFORGE_TOKEN and the
+# project id is the repository variable CURSEFORGE_PROJECT_ID — neither is ever
+# checked out or printed.
+#
+# Deliberately NOT triggered automatically on `release: published`: publishing to
+# CurseForge is public and effectively irreversible, so it is always an explicit,
+# reviewed action. Run it from the Actions tab (or `gh workflow run`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "GitHub release tag to publish, e.g. v2.0.0-mc26.1"
+        required: true
+        type: string
+      version_type:
+        description: "CurseForge release channel"
+        required: true
+        default: beta
+        type: choice
+        options: [release, beta, alpha]
+      dry_run:
+        description: "Resolve + download only; do NOT upload to CurseForge"
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Resolve release metadata from the tag
+        id: meta
+        run: |
+          TAG="${{ inputs.release_tag }}"
+          # v2.0.0-mc26.1 -> MOD=2.0.0, MC=26.1
+          MOD_VER="$(echo "$TAG" | sed -E 's/^v([^-]+)-mc.*/\1/')"
+          MC="$(echo "$TAG" | sed -E 's/^v[^-]+-mc//')"
+          if [ -z "$MOD_VER" ] || [ -z "$MC" ] || [ "$MOD_VER" = "$TAG" ]; then
+            echo "::error::Tag '$TAG' does not match the expected v<modver>-mc<mcver> scheme"; exit 1
+          fi
+
+          # 1.20.1 is the only Forge target; everything else is NeoForge.
+          case "$MC" in
+            1.20.1) LOADER=forge ;;
+            *)      LOADER=neoforge ;;
+          esac
+
+          echo "tag=$TAG"            >> "$GITHUB_OUTPUT"
+          echo "mod_version=$MOD_VER" >> "$GITHUB_OUTPUT"
+          echo "mc_version=$MC"      >> "$GITHUB_OUTPUT"
+          echo "loader=$LOADER"      >> "$GITHUB_OUTPUT"
+          echo "Resolved: tag=$TAG mod=$MOD_VER mc=$MC loader=$LOADER"
+
+      - name: Download the JAR from the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ steps.meta.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "*.jar" --dir .
+          echo "Downloaded:"; ls -la *.jar
+          test "$(ls -1 *.jar | wc -l)" -eq 1 || { echo "::error::expected exactly one jar on this release"; exit 1; }
+
+      - name: Dry run summary
+        if: ${{ inputs.dry_run }}
+        run: |
+          {
+            echo "### Dry run — nothing was uploaded"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| tag | \`${{ steps.meta.outputs.tag }}\` |"
+            echo "| mod version | \`${{ steps.meta.outputs.mod_version }}\` |"
+            echo "| game version | \`${{ steps.meta.outputs.mc_version }}\` |"
+            echo "| loader | \`${{ steps.meta.outputs.loader }}\` |"
+            echo "| channel | \`${{ inputs.version_type }}\` |"
+            echo "| file | \`$(ls -1 *.jar)\` |"
+            echo ""
+            echo "Re-run with **dry_run = false** to publish."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload to CurseForge
+        if: ${{ !inputs.dry_run }}
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: "*.jar"
+          name: "SCGuardGolem v${{ steps.meta.outputs.mod_version }} [MC ${{ steps.meta.outputs.mc_version }}]"
+          version: ${{ steps.meta.outputs.mod_version }}
+          version-type: ${{ inputs.version_type }}
+          game-versions: ${{ steps.meta.outputs.mc_version }}
+          loaders: ${{ steps.meta.outputs.loader }}
+          changelog-file: CHANGELOG.md
