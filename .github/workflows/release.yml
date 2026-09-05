@@ -38,6 +38,12 @@ jobs:
       contents: read
 
     steps:
+      # Checkout FIRST — actions/checkout cleans the workspace, which would wipe
+      # the downloaded jar if it ran later. We need the repo for CHANGELOG.md.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+
       - name: Resolve release metadata from the tag
         id: meta
         run: |
@@ -71,6 +77,16 @@ jobs:
           echo "Downloaded:"; ls -la *.jar
           test "$(ls -1 *.jar | wc -l)" -eq 1 || { echo "::error::expected exactly one jar on this release"; exit 1; }
 
+      - name: Extract this version's changelog section
+        run: |
+          V="${{ steps.meta.outputs.mod_version }}"
+          awk -v v="## $V" '$0==v{f=1;next} /^## /{if(f)exit} f' CHANGELOG.md > RELEASE_CHANGELOG.md
+          if [ ! -s RELEASE_CHANGELOG.md ]; then
+            echo "No '## $V' section found in CHANGELOG.md; falling back to a one-liner."
+            echo "SCGuardGolem $V" > RELEASE_CHANGELOG.md
+          fi
+          echo "--- changelog to be published ---"; head -20 RELEASE_CHANGELOG.md
+
       - name: Dry run summary
         if: ${{ inputs.dry_run }}
         run: |
@@ -101,4 +117,4 @@ jobs:
           version-type: ${{ inputs.version_type }}
           game-versions: ${{ steps.meta.outputs.mc_version }}
           loaders: ${{ steps.meta.outputs.loader }}
-          changelog-file: CHANGELOG.md
+          changelog-file: RELEASE_CHANGELOG.md
