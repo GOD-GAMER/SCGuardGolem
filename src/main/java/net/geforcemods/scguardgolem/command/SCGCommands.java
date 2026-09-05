@@ -36,6 +36,9 @@ public class SCGCommands {
                         .then(Commands.literal("speed")
                                 .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.1, 3.0))
                                         .executes(SCGCommands::patrolSpeed)))
+                        .then(Commands.literal("wander")
+                                .then(Commands.argument("radius", IntegerArgumentType.integer(0, 8))
+                                        .executes(SCGCommands::patrolWander)))
                         .then(Commands.literal("waypoint")
                                 .then(Commands.literal("add")
                                         .then(Commands.argument("x", IntegerArgumentType.integer())
@@ -116,6 +119,15 @@ public class SCGCommands {
         double speed = DoubleArgumentType.getDouble(ctx, "value");
         g.setPatrolSpeed(speed);
         msg(ctx, "scguardgolem.cmd.patrol_speed", String.format("%.2f", speed));
+        return 1;
+    }
+
+    private static int patrolWander(CommandContext<CommandSourceStack> ctx) {
+        SecurityGolemEntity g = requireGolem(ctx);
+        if (g == null) return 0;
+        int radius = IntegerArgumentType.getInteger(ctx, "radius");
+        g.setWanderRadius(radius);
+        msg(ctx, "scguardgolem.cmd.wander_set", radius);
         return 1;
     }
 

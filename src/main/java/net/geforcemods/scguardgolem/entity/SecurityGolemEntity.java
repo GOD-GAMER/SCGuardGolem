@@ -128,6 +128,8 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
     private int currentWaypointIndex = 0;
     private double patrolSpeed = 1.0;
     private int dwellTicks = 0;
+    /** Blocks the golem may roam around its current waypoint while dwelling; 0 = stand still. */
+    private int wanderRadius = 0;
 
     // Loot item filter (item registry names)
     private final LinkedHashSet<String> lootFilter = new LinkedHashSet<>();
@@ -619,9 +621,14 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
         }
     }
 
+    /**
+     * Recall complete: clear the flag and let the patrol carry on from waypoint 0.
+     * (It used to also switch patrol OFF, which parked the golem at its first
+     * waypoint "forever" with no way to resume from the GUI — the resume menu
+     * button was never wired — so a single bell ring read as a broken patrol.)
+     */
     public void finishRecall() {
         recalling = false;
-        setPatrolling(false);
     }
 
     // -- Patrol --
@@ -667,6 +674,10 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
     // -- Dwell time --
     public int getDwellTicks() { return dwellTicks; }
     public void setDwellTicks(int ticks) { this.dwellTicks = Math.max(0, Math.min(ticks, 200)); }
+
+    // -- Wander radius (roam around the waypoint while dwelling; 0 = stand still) --
+    public int getWanderRadius() { return wanderRadius; }
+    public void setWanderRadius(int r) { this.wanderRadius = Math.max(0, Math.min(r, 8)); }
 
     // -- Loot filter --
     public Set<String> getLootFilter() { return Collections.unmodifiableSet(lootFilter); }
@@ -739,6 +750,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
         savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("WanderRadius", wanderRadius);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
 
         // Loot filter
@@ -783,6 +795,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
         if (!legacyPw.isEmpty() && getPasscode() == null) hashAndSetPasscode(legacyPw);
         recalling = tag.getBooleanOr("Recalling", false);
         dwellTicks = tag.getIntOr("DwellTicks", 0);
+        wanderRadius = tag.getIntOr("WanderRadius", 0);
         savedWaypointIndex = tag.getIntOr("SavedWaypointIndex", 0);
 
         // Loot filter
@@ -828,6 +841,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
         savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("WanderRadius", wanderRadius);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
 
         CompoundTag filterTag = new CompoundTag();
@@ -915,6 +929,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
         savePasscodeAndSalt(tag);
         tag.putBoolean("Recalling", recalling);
         tag.putInt("DwellTicks", dwellTicks);
+        tag.putInt("WanderRadius", wanderRadius);
         tag.putInt("SavedWaypointIndex", savedWaypointIndex);
 
         CompoundTag filterTag = new CompoundTag();
@@ -1012,6 +1027,7 @@ public class SecurityGolemEntity extends IronGolem implements MenuProvider, IGua
         if (!legacyPw.isEmpty() && getPasscode() == null) hashAndSetPasscode(legacyPw);
         recalling = tag.getBoolean("Recalling");
         dwellTicks = tag.getInt("DwellTicks");
+        wanderRadius = tag.getInt("WanderRadius");
         savedWaypointIndex = tag.getInt("SavedWaypointIndex");
 
         lootFilter.clear();

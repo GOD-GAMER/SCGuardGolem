@@ -32,7 +32,8 @@ public class GolemMenu extends AbstractContainerMenu {
     private static final int DATA_PATROL = 0;
     private static final int DATA_THREAT = 1;
     private static final int DATA_DWELL  = 2;
-    private static final int DATA_COUNT  = 3;
+    private static final int DATA_WANDER = 3;
+    private static final int DATA_COUNT  = 4;
 
     public static final int TAB_CONFIG = 0;
     public static final int TAB_LOOT = 1;
@@ -79,6 +80,7 @@ public class GolemMenu extends AbstractContainerMenu {
                     case DATA_PATROL -> golem.isPatrolling() ? 1 : 0;
                     case DATA_THREAT -> golem.getThreatMode().ordinal();
                     case DATA_DWELL  -> golem.getDwellTicks();
+                    case DATA_WANDER -> golem.getWanderRadius();
                     default -> 0;
                 };
             }
@@ -87,6 +89,7 @@ public class GolemMenu extends AbstractContainerMenu {
                     case DATA_PATROL -> golem.setPatrolling(value != 0);
                     case DATA_THREAT -> golem.setThreatMode(SecurityGolemEntity.ThreatMode.fromOrdinal(value));
                     case DATA_DWELL  -> golem.setDwellTicks(Math.max(0, value));
+                    case DATA_WANDER -> golem.setWanderRadius(Math.max(0, value));
                 }
             }
             @Override public int getCount() { return DATA_COUNT; }
@@ -284,6 +287,9 @@ public class GolemMenu extends AbstractContainerMenu {
         // Dwell time: 800 = decrease by 1 s, 801 = increase by 1 s
         if (buttonId == 800) { golem.setDwellTicks(Math.max(0, golem.getDwellTicks() - 20)); return true; }
         if (buttonId == 801) { golem.setDwellTicks(golem.getDwellTicks() + 20); return true; }
+        // Wander radius: 802 = decrease by 1 block, 803 = increase by 1 block (0 = stand still)
+        if (buttonId == 802) { golem.setWanderRadius(golem.getWanderRadius() - 1); return true; }
+        if (buttonId == 803) { golem.setWanderRadius(golem.getWanderRadius() + 1); return true; }
         // Remove loot filter entry: button IDs 900+
         if (buttonId >= 900 && buttonId < 1000) {
             int idx = buttonId - 900;
@@ -305,6 +311,8 @@ public class GolemMenu extends AbstractContainerMenu {
     public ContainerData getData() { return data; }
     /** Returns dwell ticks from the synced ContainerData (safe to call client-side). */
     public int getSyncedDwellTicks() { return data.get(DATA_DWELL); }
+    /** Returns the wander radius (blocks) from the synced ContainerData (safe to call client-side). */
+    public int getSyncedWanderRadius() { return data.get(DATA_WANDER); }
     public int getPlayerInvY() { return playerInvY; }
     public int getGuiHeight() { return playerInvY + 83; }
 }

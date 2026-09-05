@@ -484,7 +484,8 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
     // Y offset constants that both draw and button-rebuild use so they stay in sync
     private static final int WP_DWELL_ROW_Y    = 18;   // top of dwell row (relative to panel top)
     private static final int WP_DWELL_ROW_H    = 16;   // height of dwell row
-    private static final int WP_SEP_Y          = WP_DWELL_ROW_Y + WP_DWELL_ROW_H + 2; // separator
+    private static final int WP_WANDER_ROW_Y   = WP_DWELL_ROW_Y + WP_DWELL_ROW_H; // wander-radius row
+    private static final int WP_SEP_Y          = WP_WANDER_ROW_Y + WP_DWELL_ROW_H + 2; // separator
     private static final int WP_LIST_START_Y   = WP_SEP_Y + 6; // first waypoint entry
 
     private void drawWaypointsTab(Gfx g, int x, int y) {
@@ -501,6 +502,13 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
         String dwellVal = dwellSec + "s";
         int valX = x + W - 62; // left edge of the value text area (buttons at W-44 and W-22)
         g.text(font, dwellVal, valX + (20 - font.width(dwellVal)) / 2, dwellY + 3, 0xFFFFFFFF, false);
+
+        // Wander-radius row (how far the golem roams around a waypoint while dwelling; 0 = stand still)
+        int wanderY = y + WP_WANDER_ROW_Y;
+        int wander = menu.getSyncedWanderRadius();
+        g.text(font, tr("scguardgolem.gui.wander"), x + 8, wanderY + 3, C_TITLE, false);
+        String wanderVal = wander == 0 ? tr("scguardgolem.gui.wander_off") : wander + "b";
+        g.text(font, wanderVal, valX + (20 - font.width(wanderVal)) / 2, wanderY + 3, 0xFFFFFFFF, false);
 
         // Separator
         int sepY = y + WP_SEP_Y;
@@ -553,6 +561,17 @@ public class GolemScreen extends AbstractContainerScreen<GolemMenu> {
             .bounds(x + W - 22, dwellBtnY, 20, dwellBtnH).build());
         listButtons.add(dwellDecBtn);
         listButtons.add(dwellIncBtn);
+
+        // Wander-radius [-] and [+] buttons (1-block steps), on the row below dwell
+        int wanderBtnY = topPos + WP_WANDER_ROW_Y;
+        Button wanderDec = addRenderableWidget(Button.builder(Component.literal("-"),
+                btn -> clickButton(802))
+            .bounds(x + W - 44, wanderBtnY, 20, dwellBtnH).build());
+        Button wanderInc = addRenderableWidget(Button.builder(Component.literal("+"),
+                btn -> clickButton(803))
+            .bounds(x + W - 22, wanderBtnY, 20, dwellBtnH).build());
+        listButtons.add(wanderDec);
+        listButtons.add(wanderInc);
 
         // Waypoint [x] remove buttons
         int maxVisible = (menu.getPlayerInvY() - WP_LIST_START_Y - 10) / 12;
